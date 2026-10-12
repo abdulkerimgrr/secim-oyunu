@@ -41,7 +41,10 @@ export function renderSettings(view, ctx) {
       try { await navigator.clipboard.writeText(txt); toast('Kopyalandı'); } catch { ta.select(); toast('Metni seçtim; kopyala komutunu kullan'); }
     };
     const a = sh.root.querySelector('#dl');
-    try { a.href = URL.createObjectURL(new Blob([txt], { type: 'application/json' })); a.download = `secim-oyunu-${s.date}.json`; } catch { a.hidden = true; }
+    // Gömülü (iframe) görünümlerde indirme izni yoktur; orada yalnızca kopyalama sunulur
+    const embedded = (() => { try { return window.top !== window.self; } catch { return true; } })();
+    if (embedded) a.hidden = true;
+    else try { a.href = URL.createObjectURL(new Blob([txt], { type: 'application/json' })); a.download = `secim-oyunu-${s.date}.json`; } catch { a.hidden = true; }
   };
   view.querySelector('#imp').onclick = () => {
     const sh = sheet(`<h2>Kaydı içe aktar</h2><label class="f">Dosya seç<input type="file" id="imp-f" accept=".json,application/json" class="in"></label>
