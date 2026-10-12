@@ -7,6 +7,8 @@ import { clamp, addDays, fmtMoney, pct } from '../engine/util.js';
 import { addNews } from '../engine/news.js';
 import { PROVINCES } from '../data/generated/provinces.js';
 import { bumpAll, bumpFaction } from '../engine/kurultay.js';
+import { addClusterMom } from '../engine/social.js';
+import { CLUSTERS } from '../data/clusters.js';
 
 function eligible(state, ev) {
   const w = ev.when || {};
@@ -66,6 +68,7 @@ export function describeOption(state, opt) {
   if (e.image) out.push(`İmaj ${r(e.image.map(x => x * 100), 0, ' puan')}`);
   if (e.region) out.push(`${e.region.name} bölgesinde etki`);
   if (e.support) out.push(`Delege desteği ${r(e.support, 0)}`);
+  if (e.cluster) { const lb = Object.entries(e.cluster.aud || {}).sort((a, b) => b[1] - a[1]).filter(([, v]) => v >= 0.5).map(([k]) => CLUSTERS.find(x => x.id === k)?.label).join(', '); out.push(lb ? `Hedef kitle: ${lb}` : 'Kitle etkisi sınırlı'); }
   if (e.factions) { const k = state.player.kurultay; out.push(Object.entries(e.factions).map(([f, v]) => `${k?.factions.find(x => x.id === f)?.label || f} ${r(v, 0)}`).join(' · ')); }
   if (e.kurultayShift) out.push('Kurultay tarihi öne alınabilir');
   if (e.scandalRisk) out.push(`Skandal riski %${Math.round(e.scandalRisk * 100)}`);
@@ -92,6 +95,8 @@ export function resolveEvent(state, uid, optIndex, rng) {
   if (e.unity) { const v = R(e.unity); p.unity = clamp(p.unity + v, 0, 100); lines.push(`İç huzur ${v >= 0 ? '+' : ''}${v.toFixed(0)}`); }
   if (e.money) { const v = Math.round(R(e.money)); p.money += v; lines.push(`Para ${fmtMoney(v)}`); }
   if (e.image) { const v = R(e.image); p.leader.image = clamp(p.leader.image + v, 0, 1); lines.push(`İmaj ${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)}`); }
+  if (e.cluster) { const v = R(e.cluster.power) * c; addClusterMom(state, p.id, e.cluster.aud, v); lines.push(`Hedef kitlede ivme ${v >= 0 ? '+' : ''}${v.toFixed(3).replace('.', ',')}`); }
+  if (e.policyStance) state.flags.policyStances = { ...(state.flags.policyStances || {}), [e.policyStance.id]: e.policyStance.stance };
   const k = state.player.kurultay;
   if (e.support && k && !state.player.isLeader) { const b = k.support; bumpAll(k, R(e.support)); lines.push(`Delege desteği ${k.support - b >= 0 ? '+' : ''}${(k.support - b).toFixed(1)}`); }
   if (e.factions && k && !state.player.isLeader) {

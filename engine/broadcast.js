@@ -4,6 +4,7 @@ import { answerFactionEffects, bumpFaction, recalcSupport } from './kurultay.js'
 import { DIFFICULTY } from './params.js';
 import { clamp } from './util.js';
 import { charMod } from './character.js';
+import { staffMod } from './staff.js';
 import { CLUSTERS } from '../data/clusters.js';
 
 const AUD = { iktidara_yakin: 'muhafazakar', muhalif: 'laik_kentli', tarafsiz: 'kararsiz', yerel: null };
@@ -35,12 +36,12 @@ export function applyAnswer(state, b, ansIndex, rng) {
   const a = q.answers[ansIndex];
   const diff = DIFFICULTY[state.difficulty] || DIFFICULTY.zor;
   const out = { lines: [], deltas: {} };
-  const tv = charMod(state, 'tv');
+  const tv = charMod(state, 'tv') * staffMod(state, 'tv');
   if (b.kind === 'kurultay') {
     const k = state.player.kurultay;
     const before = k.support;
     // hostile sorularda etkiler büyür
-    const scale = (q.hostile ? 1.3 : 1) * 1.2 * diff.effect * tv * (1 + rng.normal(0, 0.25));
+    const scale = (q.hostile ? 1.3 : 1) * 1.55 * diff.effect * tv * (1 + rng.normal(0, 0.25));
     const eff = answerFactionEffects(k, a.tags, scale);
     for (const [fid, v] of Object.entries(eff)) out.deltas[fid] = bumpFaction(k, fid, v);
     // genç aday etiketi (yaş) ve gaf ihtimali

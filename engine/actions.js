@@ -17,6 +17,13 @@ import { pressStatement, stancesFor } from './press.js';
 import { VENUES, TRANSPORT, SPEECHES } from '../data/rally.js';
 import { weatherFor } from './weather.js';
 import { prepareDebate } from './debate.js';
+import { generateSpeeches } from './speechgen.js';
+import { staffMod } from './staff.js';
+import { politicalVisit, foreignVisit, visitChance, relation } from './diplomacy.js';
+import { DESTINATIONS } from '../data/diplomacy.js';
+import { enactLaw, setMinimumWage, summit, addressNation, ensurePresidency, lawOptions } from './presidency.js';
+import { policyById, publicSupport } from './government.js';
+import { SIGNATURES_NEEDED } from './presidential.js';
 
 const DELEGATE_WEIGHTS = { teskilat: 1.5, yonetim: 0.25, degisimci: 0.8, cekirdek: 0.7 };
 const fmtSigned = v => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(1).replace('.', ',')}`;
@@ -55,7 +62,7 @@ export function topicFit(state, plate, topic) {
   let w = 0;
   CLUSTERS.forEach((c, i) => { w += info.clusters[i] * (c.priorities[topic] || 0); });
   let fit = 0.5 + 2.2 * w; // ortalama öncelik ≈ 0.2 → 0.94
-  if (topic === 'ekonomi') fit *= (1 + 0.3 * skill(state, 'ekonomist')) * charMod(state, 'economy');
+  if (topic === 'ekonomi') fit *= (1 + 0.3 * skill(state, 'ekonomist')) * charMod(state, 'economy') * staffMod(state, 'economy');
   if (topic === 'hizmet') fit *= charMod(state, 'service');
   return fit;
 }
@@ -75,7 +82,7 @@ function addCamp(state, plate, partyId, v) {
 function addRecognition(p, v) { p.recognition = clamp(p.recognition + v * (1 - p.recognition), 0, 1); }
 function gaffeChance(state, base) {
   const trained = state.flags.trainedUntil && state.flags.trainedUntil >= state.date ? 0.5 : 1;
-  return base * trained * (1 - 0.5 * skill(state, 'iletisimci')) * charMod(state, 'gaffe');
+  return base * trained * (1 - 0.5 * skill(state, 'iletisimci')) * charMod(state, 'gaffe') * staffMod(state, 'gaffe');
 }
 
 const R = (a, b, d = 2) => `${a >= 0 ? '+' : ''}${a.toFixed(d).replace('.', ',')} … ${b >= 0 ? '+' : ''}${b.toFixed(d).replace('.', ',')}`;
@@ -119,7 +126,7 @@ export const ACTIONS = [
     cost: () => 60000, personal: true,
     estimate(state, { province }) {
       const info = provinceInfo(state, province);
-      const base = (0.6 + 13 * info.seats / 600) * diff(state).effect * fatigue(state, 'delegates', province)
+      const base = (0.7 + 15 * info.seats / 600) * diff(state).effect * fatigue(state, 'delegates', province)
         * charMod(state, 'delegates') * (isHometown(state, province) ? 1.5 : 1);
       const k = state.player.kurultay;
       const w = DELEGATE_WEIGHTS;
@@ -167,12 +174,13 @@ export const ACTIONS = [
     desc: 'İl, mekân, konuşma metni ve lojistiği seç. Hava durumu ve rakip mitingleri katılımı etkiler; dolmayan meydan manşet olur.',
     cost: (state, { province, venue = 'meydan', transport = 'yok' } = {}) => {
       const v = VENUES.find(x => x.id === venue) || VENUES[0], t = TRANSPORT.find(x => x.id === transport) || TRANSPORT[0];
-      return Math.round((150000 + 1_600_000 * Math.sqrt(provinceInfo(state, province || 34).popShare)) * v.cost * (1 + t.cost));
+      return Math.round((150000 + 1_600_000 * Math.sqrt(provinceInfo(state, province || 34).popShare)) * v.cost * (1 + t.cost) * staffMod(state, 'rallyCost'));
     },
     estimate(state, { province, venue = 'meydan', topic = 'ekonomi', speech, tone = 'uzlasmaci', transport = 'yok' }) {
       const p = playerParty(state), info = provinceInfo(state, province);
       const v = VENUES.find(x => x.id === venue) || VENUES[0], t = TRANSPORT.find(x => x.id === transport) || TRANSPORT[0];
-      const sp = (SPEECHES[topic] || SPEECHES.ekonomi).find(x => x.id === speech) || (SPEECHES[topic] || SPEECHES.ekonomi)[0];
+      const opts = generateSpeeches(state, province, topic);
+      const sp = opts.find(x => x.id === speech) || opts[0];
       const org = p.orgs[province] || 0;
       const quality = 0.6 + 0.5 * org + 0.3 * skill(state, 'saha');
       // konu + konuşma metninin ildeki seçmen kümelerine uyumu
@@ -190,10 +198,10 @@ export const ACTIONS = [
       const wM = v.open ? weather.mult : 1;
       const camp = 0.12 * diff(state).effect * quality * fit * toneM * f * charMod(state, 'rally') * home * v.effect * clashM;
       const rec = (0.003 + 0.012 * Math.sqrt(info.popShare)) * (0.5 + p.media) * diff(state).effect * f * (v.id === 'salon' ? 0.6 : 1) * clashM;
-      const crowd = info.registered * 0.004 * (0.15 + p.recognition) * (0.25 + org) * (1 + 0.3 * skill(state, 'saha')) * t.crowd * wM * clashM;
+      const crowd = info.registered * 0.004 * (0.15 + p.recognition) * (0.25 + org) * (1 + 0.3 * skill(state, 'saha')) * t.crowd * wM * clashM * staffMod(state, 'crowd');
       const capacity = v.id === 'salon' ? clamp(info.registered * 0.0008, 1500, 9000) : Math.max(2500, info.registered * 0.004 * v.cap);
       return { camp: [camp * 0.6, camp * 1.3], recognition: [rec * 0.7, rec * 1.3], crowd, capacity, fill: crowd / capacity, fit, weather: v.open ? weather : null, clash,
-        risk: gaffeChance(state, tone === 'sert' ? 0.1 : 0.05), transportRisk: t.risk, fatigue: f, speech: sp, venue: v };
+        risk: gaffeChance(state, tone === 'sert' ? 0.1 : 0.05), transportRisk: t.risk * staffMod(state, 'scandal'), fatigue: f, speech: sp, venue: v };
     },
     run(state, prm, rng) {
       const p = playerParty(state), e = this.estimate(state, prm);
@@ -246,7 +254,7 @@ export const ACTIONS = [
     cost: () => 40000,
     estimate(state, { province }) {
       const f = fatigue(state, 'visit', province);
-      const camp = 0.05 * diff(state).effect * (1 + 0.3 * skill(state, 'saha')) * f * charMod(state, 'visit') * (isHometown(state, province) ? 1.4 : 1);
+      const camp = 0.05 * diff(state).effect * (1 + 0.3 * skill(state, 'saha')) * f * charMod(state, 'visit') * staffMod(state, 'field') * (isHometown(state, province) ? 1.4 : 1);
       return { camp: [camp * 0.6, camp * 1.3], org: [0.005, 0.02], fatigue: f };
     },
     run(state, prm, rng) {
@@ -348,6 +356,104 @@ export const ACTIONS = [
     },
   })),
 
+  // --- Diplomasi ---
+  { id: 'polvisit', cat: 'Diplomasi', icon: '🤝', label: 'Siyasi ziyaret', ap: 1, params: ['target'],
+    desc: 'Bir parti genel başkanını ya da Cumhurbaşkanını ziyaret et. İlişkiler ittifak ihtimalini artırır, rakip saldırılarını yumuşatır.',
+    cost: () => 30000,
+    available(state, { target } = {}) { if (target && target !== 'cb' && !state.parties[target]) return 'Geçersiz hedef.'; return true; },
+    estimate(state, { target = 'cb' }) { return { visitChance: visitChance(state, target), relation: target === 'cb' ? null : relation(state, target) }; },
+    run(state, prm, rng) {
+      const r = politicalVisit(state, prm.target || 'cb', rng);
+      const lines = r.ok ? [`Görüşme ${r.mood} geçti.`, r.relation !== null ? `İlişki puanı: ${r.relation} (+${Math.round(r.delta)})` : 'Devlet adamlığı imajın güçlendi.', ...(r.baseCost ? [`Kendi tabanında bazı itirazlar oldu (iç huzur −${r.baseCost.toFixed(0)})`] : [])]
+        : ['Randevu talebine olumlu yanıt gelmedi.', ...(r.relation !== null ? [`İlişki puanı: ${r.relation}`] : [])];
+      const t = prm.target && prm.target !== 'cb' ? state.parties[prm.target] : null;
+      return { title: r.ok ? `${r.host} ile görüşme` : 'Ziyaret gerçekleşmedi', bad: !r.ok, lines,
+        anim: { kind: 'polvisit', ok: r.ok, mood: r.mood, host: r.host, hostColor: t?.color || '#C8102E', hostShort: t?.short || 'TC', color: playerParty(state).color } };
+    } },
+  { id: 'foreign', cat: 'Diplomasi', icon: '✈️', label: 'Dış temas', ap: 2, params: ['destination'],
+    desc: 'Yurt dışı temasları uluslararası itibarını artırır. Her başkentin seçmen kümelerinde karşılığı farklıdır.',
+    cost: () => 400000,
+    estimate(state, { destination = 'bruksel' }) {
+      const d = DESTINATIONS.find(x => x.id === destination);
+      const aud = {};
+      for (const c of CLUSTERS) { let a = d.dis * c.ideo.dis; if (d.milli) a += d.milli * c.ideo.milli * 0.5; if (d.din) a += d.din * c.ideo.din * 0.5; if (a > 0.15) aud[c.id] = a; }
+      return { audience: aud, intl: true };
+    },
+    run(state, prm, rng) {
+      const r = foreignVisit(state, prm.destination || 'bruksel', rng);
+      const lines = [r.success ? 'Temaslar başarılı geçti; uluslararası basında yer aldı.' : 'Temaslar sınırlı ilgi gördü.', `Uluslararası itibar: ${Math.round(r.intlRep)}/100`];
+      if (r.likes.length) lines.push(`Olumlu karşılayanlar: ${r.likes.join(', ')}`);
+      if (r.dislikes.length) lines.push(`Mesafeli kalanlar: ${r.dislikes.join(', ')}`);
+      return { title: `${r.dest.city} temasları`, bad: !r.success, lines, anim: { kind: 'foreign', dest: r.dest.id, city: r.dest.city, icon: r.dest.icon, ok: r.success, color: playerParty(state).color } };
+    } },
+
+  // --- Cumhurbaşkanlığı (yalnızca cumhurbaşkanıyken) ---
+  { id: 'cbEconomy', cat: 'Cumhurbaşkanlığı', icon: '🏦', label: 'Ekonomi yönetimi: para politikası', ap: 1, presidentOnly: true, params: ['econStance'], cost: () => 0,
+    desc: 'Merkez Bankası\'na yaklaşımını belirle. Sıkı politika enflasyonu düşürür ama büyümeyi yavaşlatır; gevşek politika tersini yapar.',
+    estimate(state, { econStance = 'dengeli' }) { return { econNote: { siki: 'Enflasyon hedefi düşer, büyüme ve onay biraz azalır', dengeli: 'Mevcut gidişat korunur', gevsek: 'Büyüme artar; enflasyon ve kur yükselir' }[econStance] }; },
+    run(state, prm) {
+      const p = ensurePresidency(state); p.econStance = prm.econStance || 'dengeli';
+      if (p.econStance === 'siki') state.economy.target = Math.max(8, state.economy.target - 3);
+      if (p.econStance === 'gevsek') state.economy.target += 3;
+      addNews(state, 'gov', `Cumhurbaşkanlığı ekonomi yönetiminde ${{ siki: 'sıkı', dengeli: 'dengeli', gevsek: 'gevşek' }[p.econStance]} para politikasına geçildiğini açıkladı`);
+      return { title: 'Ekonomi programı güncellendi', lines: [`Para politikası: ${{ siki: 'Sıkı', dengeli: 'Dengeli', gevsek: 'Gevşek' }[p.econStance]}`, 'Merkez Bankası her ay bu yaklaşıma göre faiz kararı verecek.'], anim: { kind: 'cb', icon: '🏦', label: 'Ekonomi programı' } };
+    } },
+  { id: 'cbLaw', cat: 'Cumhurbaşkanlığı', icon: '📜', label: 'Kanun teklifi gönder', ap: 2, presidentOnly: true, params: ['policy'], cost: () => 0,
+    desc: 'Meclis\'e kanun teklifi gönder. Geçmesi için ittifakının sandalye çoğunluğu gerekir; kamuoyu desteği onay oranını etkiler.',
+    estimate(state, { policy }) {
+      const pol = policyById(policy) || lawOptions(state)[0];
+      const seats = state.government.reduce((a, id) => a + (state.parliament.seats[id] || 0), 0);
+      return { lawSupport: publicSupport(state, pol), seats, need: pol.needs || 301, audience: pol.pro };
+    },
+    run(state, prm, rng) {
+      const r = enactLaw(state, prm.policy || lawOptions(state)[0].id, rng);
+      const pol = policyById(prm.policy || lawOptions(state)[0].id);
+      return { title: r.passes ? `Kabul edildi: ${pol.title}` : `Reddedildi: ${pol.title}`, bad: !r.passes,
+        lines: [`Meclis'te ittifak sandalyesi: ${r.seats} (gereken ${r.need})`, `Kamuoyu desteği: %${Math.round(r.support * 100)}`, ...(r.passes ? [`Onay oranı ${r.approvalDelta >= 0 ? '+' : ''}${r.approvalDelta.toFixed(1).replace('.', ',')}`] : ['Onay oranı −2'])],
+        anim: { kind: 'cb', icon: '📜', label: pol.title, ok: r.passes } };
+    } },
+  { id: 'cbWage', cat: 'Cumhurbaşkanlığı', icon: '💵', label: 'Asgari ücret kararı', ap: 1, presidentOnly: true, params: ['wage'], cost: () => 0,
+    desc: 'Yılda bir kez asgari ücret artışını belirle. Yüksek artış onay getirir ama enflasyonu körükler.',
+    available(state) { return state.presidency?.wageYear === state.date.slice(0, 4) ? 'Bu yıl asgari ücret belirlendi.' : true; },
+    estimate(state, { wage = 40 }) { return { econNote: `Enflasyona etkisi yaklaşık +${((wage - 30) * 0.08).toFixed(1).replace('.', ',')} puan` }; },
+    run(state, prm, rng) {
+      const r = setMinimumWage(state, prm.wage || 40, rng);
+      return { title: `Asgari ücrete %${prm.wage || 40} zam`, lines: [`Onay oranı ${r.approvalDelta >= 0 ? '+' : ''}${r.approvalDelta.toFixed(1).replace('.', ',')}`, `Enflasyon etkisi +${r.infl.toFixed(1).replace('.', ',')} puan`], anim: { kind: 'cb', icon: '💵', label: 'Asgari ücret' } };
+    } },
+  { id: 'cbSummit', cat: 'Cumhurbaşkanlığı', icon: '🛬', label: 'Resmi ziyaret ve zirve', ap: 2, presidentOnly: true, params: ['destination'], cost: () => 0,
+    desc: 'Devlet başkanı olarak resmi ziyaret. Dış ilişkileri doğrudan iyileştirir; Dışişleri Bakanının yetkinliği önemlidir.',
+    estimate() { return { econNote: 'İlgili dış ilişki puanı +2 … +8' }; },
+    run(state, prm, rng) {
+      const r = summit(state, prm.destination || 'bruksel', rng);
+      return { title: `${r.dest.city} resmi ziyareti`, bad: !r.ok, lines: [r.ok ? 'Anlaşmalar imzalandı; ilişkiler güçlendi.' : 'Ziyaret beklenen sonucu vermedi.'], anim: { kind: 'foreign', dest: r.dest.id, city: r.dest.city, icon: r.dest.icon, ok: r.ok, color: playerParty(state).color } };
+    } },
+  { id: 'cbAddress', cat: 'Cumhurbaşkanlığı', icon: '🇹🇷', label: 'Ulusa sesleniş', ap: 1, presidentOnly: true, params: ['topic'], cost: () => 0,
+    desc: 'Tüm kanallardan canlı yayınla ulusa seslen. Onay oranını yükseltir; sık yapılırsa etkisi azalır.',
+    estimate() { return { econNote: 'Onay +0,5 … +3,5 (6 haftada birden sık yapılırsa azalır)' }; },
+    run(state, prm, rng) {
+      const r = addressNation(state, prm.topic, rng);
+      return { title: 'Ulusa sesleniş', lines: [`Onay oranı +${r.approvalDelta.toFixed(1).replace('.', ',')}`, ...(r.fatigue ? ['Son seslenişin üzerinden az zaman geçti; etki sınırlı kaldı.'] : [])], anim: { kind: 'cb', icon: '🇹🇷', label: 'Ulusa sesleniş' } };
+    } },
+  { id: 'cbSignatures', cat: 'Teşkilat', icon: '🗳️', label: 'Cumhurbaşkanlığı adaylığı için imza', ap: 2, params: [], cost: () => 200000,
+    desc: 'Partin %5\'in altındaysa aday olabilmek için 100 bin seçmen imzası gerekir. Seçimden önceki son yılda yapılabilir.',
+    available(state) {
+      const days = (Date.parse(state.nextElection) - Date.parse(state.date)) / 86400000;
+      if (days > 365) return 'Seçime bir yıldan az kaldığında başlar.';
+      if ((state.flags.cbSignatures || 0) >= SIGNATURES_NEEDED) return 'Yeterli imza toplandı.';
+      return true;
+    },
+    estimate(state) {
+      const p = playerParty(state);
+      const g = (8000 + 60000 * p.recognition + 0.08 * p.members + 4000 * Object.keys(p.orgs).length / 10) * diff(state).effect;
+      return { signaturesCb: [g * 0.6, g * 1.3] };
+    },
+    run(state, prm, rng) {
+      const e = this.estimate(state);
+      const g = Math.round(rng.range(...e.signaturesCb));
+      state.flags.cbSignatures = Math.min(SIGNATURES_NEEDED * 1.2, (state.flags.cbSignatures || 0) + g);
+      return { title: 'Adaylık imza kampanyası', lines: [`${fmtInt(g)} yeni imza`, `Toplam: ${fmtInt(state.flags.cbSignatures)} / ${fmtInt(SIGNATURES_NEEDED)}`], anim: { kind: 'signatures', value: Math.min(100, state.flags.cbSignatures / SIGNATURES_NEEDED * 100), need: 100 } };
+    } },
+
   // --- Teşkilat ---
   { id: 'buildOrg', cat: 'Teşkilat', icon: '🏢', label: 'İl teşkilatı kur', ap: 1, params: ['province'], foundOnly: true,
     desc: 'İl başkanlığı açar. Seçime girmek için en az 41 ilde teşkilat gerekir.',
@@ -423,7 +529,7 @@ export const ACTIONS = [
       const p = playerParty(state);
       const poll = state.polls.length ? (state.polls[state.polls.length - 1].shares[p.id] || 0) : 0;
       const m = (150000 + 2_500_000 * p.recognition + 20_000_000 * poll) * (1 + 0.5 * skill(state, 'finansci')) * diff(state).money * fatigue(state, 'fundraise') * priceIndex(state) * charMod(state, 'fundraise');
-      return { money: [m * 0.5, m * 1.4], risk: 0.05 * (1 - 0.7 * skill(state, 'hukukcu')) * charMod(state, 'scandal') };
+      return { money: [m * 0.5, m * 1.4], risk: 0.05 * (1 - 0.7 * skill(state, 'hukukcu')) * charMod(state, 'scandal') * staffMod(state, 'scandal') };
     },
     run(state, prm, rng) {
       const p = playerParty(state), e = this.estimate(state);
@@ -477,7 +583,7 @@ export function actionById(id) { return ACTIONS.find(a => a.id === id); }
 
 export function availableActions(state) {
   const pre = state.player.mode === 'join' && !state.player.isLeader;
-  return ACTIONS.filter(a => pre ? a.preKurultay : (!a.preKurultay && (!a.foundOnly || state.player.mode === 'found')));
+  return ACTIONS.filter(a => pre ? a.preKurultay : (!a.preKurultay && (!a.foundOnly || state.player.mode === 'found') && (!a.presidentOnly || state.player.isPresident)));
 }
 
 // Tüm maliyetler Haziran 2023 fiyatlarıyla tanımlı; oyun içi enflasyonla ölçeklenir
@@ -511,6 +617,12 @@ export function describeEstimate(state, action, prm) {
   const e = action.estimate(state, prm);
   const out = [];
   if (e.audience && Object.keys(e.audience).length) out.push(['Hedef kitle', Object.entries(e.audience).sort((a, b) => b[1] - a[1]).filter(([, v]) => v >= 0.5).map(([k]) => CLUSTERS.find(c => c.id === k).label).join(', ') || 'Geniş kitle']);
+  if (e.econNote) out.push(['Etki', e.econNote]);
+  if (e.lawSupport !== undefined) out.push(['Kamuoyu desteği', pct(e.lawSupport, 0)], ['Meclis', `${e.seats} sandalye / gereken ${e.need}`]);
+  if (e.signaturesCb) out.push(['Yeni imza', `${fmtInt(e.signaturesCb[0])} … ${fmtInt(e.signaturesCb[1])}`], ['Toplanan', `${fmtInt(state.flags.cbSignatures || 0)} / ${fmtInt(SIGNATURES_NEEDED)}`]);
+  if (e.visitChance !== undefined) out.push(['Kabul ihtimali', pct(e.visitChance, 0)]);
+  if (e.relation !== undefined && e.relation !== null) out.push(['Mevcut ilişki', `${e.relation} / 100`]);
+  if (e.intl) out.push(['Uluslararası itibar', `şu an ${Math.round(state.flags.intlRep || 10)}/100`]);
   if (e.cluster) out.push(['Kitle etkisi', R(e.cluster[0], e.cluster[1], 3)]);
   if (e.shield) out.push(['Kalkan', 'Rakip saldırıları −%50']);
   if (e.backfire) out.push(['Ters tepme riski', pct(e.backfire, 0)]);

@@ -9,7 +9,7 @@ import { storeProjection } from '../../engine/polls.js';
 import { playerParty } from '../../engine/state.js';
 import { randomCharacter } from '../../data/character.js';
 import { CITIZENS, CITIZEN_LINES } from '../../data/press.js';
-import { sfx } from '../sound.js';
+import { sfx, duckMusic } from '../sound.js';
 
 const ANSWER_SECONDS = 30;
 function seeded(seed) { let s = seed % 2147483647 || 7; return () => (s = (s * 16807) % 2147483647) / 2147483647; }
@@ -178,12 +178,13 @@ export function showBroadcast(ctx, b) {
     } else {
       body.innerHTML = `${rating}<div class="tv-react"><b>Yayın tamamlandı</b><span>Etkiler ulusal ivmene ve tanınırlığına işlendi.</span></div><button class="btn-end tv-next" id="tv-close">Stüdyodan çık</button>`;
     }
-    $('#tv-close').onclick = () => { clearInterval(vwTick); clearInterval(timer); o.remove(); ctx.render(); };
+    $('#tv-close').onclick = () => { clearInterval(vwTick); clearInterval(timer); o.remove(); duckMusic(false); ctx.render(); };
   };
 
   // Jenerik, sonra ilk soru
   const intro = $('#tv-intro');
   sfx('jingle');
+  duckMusic(true);
   if (reducedMotion()) { intro.remove(); ask(); }
   else setTimeout(() => { intro.classList.add('out'); setTimeout(() => { intro.remove(); ask(); }, 450); }, 1500);
 }

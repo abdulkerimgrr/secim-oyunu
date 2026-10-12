@@ -10,6 +10,11 @@ import { avatarSvg } from '../avatar.js';
 import { mixColor } from '../map.js';
 import { PROFESSIONS, TRAITS, EDUCATION } from '../../data/character.js';
 import { PROVINCE_BY_PLATE } from '../../engine/state.js';
+import { STAFF_ROLES } from '../../data/staff.js';
+import { candidatesFor, hire, fire } from '../../engine/staff.js';
+import { sheet, toast } from '../dom.js';
+import { saveGame } from '../../engine/save.js';
+import { priceIndex } from '../../engine/util.js';
 
 export function renderParty(view, ctx) {
   const s = ctx.state;
@@ -46,7 +51,7 @@ export function renderParty(view, ctx) {
 
   if (!pre) {
     const b = weeklyBudget(s);
-    const L = { aidat: 'Üye aidatları', hazine: 'Hazine yardımı', bagis: 'Düzenli bağışlar', genelMerkez: 'Genel merkez', teskilat: 'Teşkilat giderleri', personel: 'Personel' };
+    const L = { aidat: 'Üye aidatları', hazine: 'Hazine yardımı', bagis: 'Düzenli bağışlar', genelMerkez: 'Genel merkez', teskilat: 'Teşkilat giderleri', personel: 'Personel', ekip: 'Ekip maaşları' };
     view.insertAdjacentHTML('beforeend', `<section class="card"><h2>Bütçe <small>haftalık</small></h2>
       <div class="row" style="justify-content:space-between;margin-bottom:6px"><span>Kasa</span><b class="num" style="font-family:var(--f-display);font-size:24px;color:${me.money < 0 ? 'var(--bad)' : 'var(--ink)'}">${fmtMoney(me.money)}</b></div>
       <dl class="kv">${Object.entries(b.income).map(([k, v]) => `<dt>+ ${L[k]}</dt><dd style="color:var(--good)">${fmtMoney(v)}</dd>`).join('')}
@@ -55,6 +60,14 @@ export function renderParty(view, ctx) {
       <p class="small muted" style="margin:8px 0 0">Hazine yardımı yalnızca son genel seçimde %3'ü geçen partilere verilir${treasuryAid(s, me.id) ? '' : ' (şu an almıyorsun)'}. 16 hafta üst üste borçta kalan parti dağılır. Tutarlar oyun içi tahminlerdir.</p></section>`);
   }
 
+  if (!pre) {
+    const st = s.staff || {};
+    view.insertAdjacentHTML('beforeend', `<section class="card"><h2>Ekip <small>haftalık maaş bütçeden düşer</small></h2>
+      <div class="list">${STAFF_ROLES.map(r => { const m = st[r.id]; return `<div class="li"><span style="font-size:22px;width:28px;text-align:center">${r.icon}</span><div class="grow"><div class="t small">${esc(r.label)}</div>
+        <div class="small muted">${m ? `${esc(m.name)} · yetkinlik ${Math.round(m.level * 100)} · ${fmtMoney(m.salary * priceIndex(s))}/hafta` : esc(r.desc)}</div></div>
+        ${m ? `<button class="btn small-btn" data-fire="${r.id}">Çıkar</button>` : `<button class="btn small-btn primary" data-hire="${r.id}">İşe al</button>`}</div>`; }).join('')}</div>
+      <p class="small muted" style="margin:6px 0 0">Uluslararası itibar: <b>${Math.round(s.flags.intlRep || 10)}/100</b> · dış temaslarla artar ve Cumhurbaşkanlığı yarışında avantaj sağlar.</p></section>`);
+  }
   if (me.founders?.length) view.insertAdjacentHTML('beforeend', `<section class="card"><h2>Kurucu kadro</h2><div class="list">${me.founders.map(f => `<div class="li"><div class="grow"><div class="t">${esc(f.name)} <span class="pill good">${SKILLS[f.skill].label}</span></div><div class="small muted">${SKILLS[f.skill].desc}</div></div><div class="small num" style="text-align:right">Yetkinlik ${Math.round(f.level * 100)}<br>Sadakat ${f.loyalty}</div></div>`).join('')}</div></section>`);
 
   view.insertAdjacentHTML('beforeend', `<section class="card"><h2>İdeoloji</h2><div style="display:flex;flex-direction:column;gap:8px">${AXES.map(a => {
@@ -73,4 +86,15 @@ export function renderParty(view, ctx) {
   view.insertAdjacentHTML('beforeend', `<section class="card"><h2>Dönem istatistikleri</h2><dl class="kv">
     <dt>Miting</dt><dd>${s.stats.rallies}</dd><dt>TV programı</dt><dd>${s.stats.tv}</dd><dt>Gaf</dt><dd>${s.stats.gaffes}</dd>
     <dt>Toplam harcama</dt><dd>${fmtMoney(s.stats.moneySpent)}</dd><dt>En yüksek anket</dt><dd>${pct(s.stats.peakPoll)}</dd></dl></section>`);
+
+  view.querySelectorAll('[data-hire]').forEach(b => b.onclick = () => {
+    const role = STAFF_ROLES.find(r => r.id === b.dataset.hire);
+    const cands = candidatesFor(s, role.id);
+    const sh = sheet(`<div class="eyebrow">${role.icon} ${esc(role.label)}</div><h2>Aday seç</h2><p class="small" style="margin:0">${esc(role.desc)}</p>
+      <div class="list">${cands.map(c => `<div class="li"><div class="grow"><div class="t">${esc(c.name)}</div><div class="small muted">Yetkinlik ${Math.round(c.level * 100)} · sadakat ${c.loyalty} · ${fmtMoney(c.salary * priceIndex(s))}/hafta</div>
+        <div class="kfbar"><div style="width:${c.level * 100}%;background:var(--good)"></div></div></div><button class="btn small-btn primary" data-pick="${c.id}">Al</button></div>`).join('')}</div>
+      <p class="small muted" style="margin:0">Aday listesi her ay yenilenir. İlk haftanın maaşı peşin ödenir.</p>`);
+    sh.root.querySelectorAll('[data-pick]').forEach(x => x.onclick = () => { hire(s, cands.find(c => c.id === x.dataset.pick)); saveGame(s, 'oto'); sh.close(); toast('İşe alındı'); ctx.render(); });
+  });
+  view.querySelectorAll('[data-fire]').forEach(b => b.onclick = () => { fire(s, b.dataset.fire); saveGame(s, 'oto'); toast('Ekipten ayrıldı'); ctx.render(); });
 }

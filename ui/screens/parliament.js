@@ -6,7 +6,9 @@ import { computeSeats } from '../../engine/election.js';
 import { proposeAlliance, leaveAlliance, allianceChance } from '../../engine/turn.js';
 import { playerParty } from '../../engine/state.js';
 import { saveGame } from '../../engine/save.js';
-import { fmtDate, pct } from '../../engine/util.js';
+import { fmtDate, pct, fmtInt } from '../../engine/util.js';
+import { relation } from '../../engine/diplomacy.js';
+import { nominees, SIGNATURES_NEEDED } from '../../engine/presidential.js';
 
 // Yarım daire sırası: sol → sağ (ideolojik "din + milli" eksenine göre kabaca)
 function order(s, seats) {
@@ -61,4 +63,18 @@ export function renderParliament(view, ctx) {
     saveGame(s, 'oto'); ctx.render();
     sheet(`<h2>${r.ok ? 'Teklif kabul edildi' : 'Teklif reddedildi'}</h2><p>${esc(r.text)}</p>`);
   });
+
+  // İlişkiler
+  if (!pre) {
+    const ps = Object.values(s.parties).filter(p => !p.aggregate && !p.dissolved && p.id !== me.id);
+    view.insertAdjacentHTML('beforeend', `<section class="card"><h2>Partilerle ilişkiler <small>−100 … +100</small></h2><div class="bars">${ps.map(p => { const r = relation(s, p.id); const w = (r + 100) / 2;
+      return `<div class="bar" style="grid-template-columns:64px 1fr 44px"><span class="name">${esc(p.short)}</span><div class="track"><div class="fill" style="width:${w}%;background:${r >= 20 ? 'var(--good)' : r <= -20 ? 'var(--bad)' : 'var(--warn)'}"></div><div class="thr" style="left:50%;border-color:var(--ink-2)"></div></div><span class="val">${r}</span></div>`; }).join('')}</div>
+      <p class="small muted" style="margin:6px 0 0">Kampanya → Diplomasi → Siyasi ziyaret ile ilişkileri geliştirebilirsin. İyi ilişki ittifak ihtimalini artırır.</p></section>`);
+  }
+  // Cumhurbaşkanlığı yarışı
+  const noms = nominees(s);
+  view.insertAdjacentHTML('beforeend', `<section class="card"><h2>Cumhurbaşkanlığı yarışı <small>${fmtDate(s.nextElection)} · iki turlu</small></h2>
+    <p class="small" style="margin:0 0 6px">Cumhurbaşkanı: <b>${esc(s.president)}</b>${s.player.isPresident ? ' (sen)' : ''}</p>
+    <div class="list">${noms.map(c => `<div class="li"><span class="badge" style="background:${c.color}">${esc(c.short)}</span><div class="grow"><div class="t small">${esc(c.name)}${c.isPlayer ? ' <span class="pill good">sen</span>' : ''}</div><div class="small muted">${c.parties.map(id => s.parties[id].short).join(' + ')}</div></div></div>`).join('')}</div>
+    <p class="small muted" style="margin:6px 0 0">Aday gösterebilmek için son seçimde %5 oy ya da 20 milletvekili gerekir; aksi hâlde 100 bin seçmen imzası (Teşkilat → Cumhurbaşkanlığı adaylığı için imza). Toplanan imza: ${fmtInt(s.flags.cbSignatures || 0)} / ${fmtInt(SIGNATURES_NEEDED)}. Görev süresi dolan Cumhurbaşkanı yerine partisi yeni bir aday çıkarır.</p></section>`);
 }

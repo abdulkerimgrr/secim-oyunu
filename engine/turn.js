@@ -13,6 +13,9 @@ import { allianceShare } from './model.js';
 import { weeklyPull, runKurultayVote } from './kurultay.js';
 import { charMod } from './character.js';
 import { socialTick } from './social.js';
+import { govTick, ensureGovState } from './government.js';
+import { weeklyStaffCost, staffMod } from './staff.js';
+import { presidencyTick } from './presidency.js';
 
 export function withRng(state, fn) {
   const rng = createRng(state.seed);
@@ -60,6 +63,7 @@ export function weeklyBudget(state) {
     genelMerkez: (big ? 0.55 * income.hazine + 300000 : 40000 + 800 * orgN) * infl,
     teskilat: big ? 0 : orgCost,
     personel: (big ? 200000 : 15000 + 4000 * (p.founders?.length || 0)) * infl,
+    ekip: weeklyStaffCost(state),
   };
   return { income, expense, net: Object.values(income).reduce((a, b) => a + b, 0) - Object.values(expense).reduce((a, b) => a + b, 0) };
 }
@@ -116,9 +120,12 @@ export function endTurn(state) {
     const out = { results: [] };
     const days = state.phase === 'campaign' ? 1 : 7;
     const f = days / 7;
+    ensureGovState(state);
     rivalsAct(state, rng, f);
     socialTick(state, rng, f);
     economyStep(state, rng, days);
+    govTick(state, rng, f, { playerGoverns: !!state.player.isPresident });
+    presidencyTick(state, rng, f);
 
     // Sönümler
     const cd = Math.pow(K.campDecay, f), md = Math.pow(K.momDecay, f);
@@ -158,6 +165,7 @@ export function endTurn(state) {
     // Olaylar
     maybeTriggerEvent(state, rng, state.phase === 'campaign' ? 0.2 : 0.45);
     if (state.intel > 0) state.intel -= f;
+    if (staffMod(state, 'intel')) state.intel = Math.max(state.intel || 0, 1);
 
     // Takvim
     state.date = addDays(state.date, days);
@@ -194,9 +202,10 @@ export function endTurn(state) {
     if (toElection <= 0) {
       const r = runGeneralElection(state, rng);
       state.phase = 'normal';
+      if (r.cb) out.results.push(r, r.cb), out.pushed = true;
       state.nextElection = addDays(state.nextElection, 365 * 5 + 1);
       state.localElection = addDays(state.nextElection, -365 * 4); // yaklaşık
-      out.results.push(r);
+      if (!out.pushed) out.results.push(r);
       if (state.player.mode === 'found') me.onBallot = false;
     }
 
@@ -251,5 +260,6 @@ export function allianceChance(state, targetId) {
   let p = 0.1 - 1.0 * dist + (theirs < thr ? 0.2 : 0) + Math.min(0.5, mine * 6) + 0.1 * me.recognition - (theirs > 0.2 ? 0.2 : 0);
   if (state.government.includes(t.id) && !state.government.includes(me.id)) p -= 0.3;
   p += charMod(state, 'alliance');
-  return clamp(p, 0.02, 0.9);
+  p += (state.relations?.[targetId] || 0) / 300;
+  return clamp(p, 0.02, 0.92);
 }

@@ -61,7 +61,7 @@ function precompute(state, parties) {
       base: K.recog * Math.log(Math.max(0.003, p.recognition)) + K.image * imageDelta
             - K.ideologyShift * shift * shift * 4,
       mom: p.momentum,
-      econ: (p.govWeight || 0) * m * K.econ,
+      econ: (p.govWeight || 0) * Math.max(-20, Math.min(30, m)) * K.econ,
       tactical,
       cmom: state.clusterMom?.[p.id] || null,
       dist: CLUSTERS.map(c => ideologyDistance(c.ideo, p.ideology)),

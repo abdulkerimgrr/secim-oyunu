@@ -5,6 +5,7 @@ import { DIFFICULTY } from './params.js';
 import { clamp } from './util.js';
 import { addClusterMom } from './social.js';
 import { charMod } from './character.js';
+import { staffMod } from './staff.js';
 
 export const stancesFor = topic => PRESS_STANCES[topic] || [];
 
@@ -34,7 +35,7 @@ export function pressStatement(state, topic, stanceId, rng, fatigueMul = 1) {
   if (uturn) quality *= 0.4;
   const gaffe = st.tone === 'sert' && rng.chance(0.08 * charMod(state, 'gaffe'));
   if (gaffe) quality *= 0.3;
-  const power = 0.03 * reach * quality * diff.effect * fatigueMul;
+  const power = 0.03 * reach * quality * diff.effect * fatigueMul * staffMod(state, 'press');
   addClusterMom(state, p.id, st.audience, power);
   p.momentum += power * 0.25;
   p.recognition = clamp(p.recognition + 0.004 * reach * (1 - p.recognition), 0, 1);

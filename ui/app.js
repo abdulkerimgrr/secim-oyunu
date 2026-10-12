@@ -13,6 +13,7 @@ import { renderAgenda } from './screens/agenda.js';
 import { renderCampaign } from './screens/campaign.js';
 import { renderParliament } from './screens/parliament.js';
 import { renderSettings } from './screens/settings.js';
+import { renderPresidency } from './screens/presidency.js';
 import { renderNewGame } from './screens/newgame.js';
 import { showResult, showGameOver } from './screens/results.js';
 import { showBroadcast } from './screens/broadcast.js';
@@ -20,7 +21,8 @@ import { showDebate } from './screens/debate.js';
 import { mountBackgroundMap } from './bgmap.js';
 import { avatarSvg } from './avatar.js';
 import { mixColor } from './map.js';
-import { sfx, soundToggleHtml, bindSoundToggle } from './sound.js';
+import { sfx, soundToggleHtml, bindSoundToggle, duckMusic } from './sound.js';
+import { initMusic, playTrack } from './music.js';
 
 const ICONS = {
   harita: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Zm0 0v14m6-12v14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',
@@ -28,6 +30,7 @@ const ICONS = {
   gundem: '<path d="M4 5h13v14H6a2 2 0 0 1-2-2V5Zm13 4h3v8a2 2 0 0 1-2 2M7 9h7M7 13h7M7 16h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',
   kampanya: '<path d="M3 10v4l11 5V5L3 10Zm11 0h3a3 3 0 0 1 0 6h-3M6 14.5 7.5 20h3l-1.2-4.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',
   meclis: '<path d="M3 20h18M5 20v-7m4 7v-7m6 7v-7m4 7v-7M3 11h18L12 4 3 11Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',
+  makam: '<path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9L12 3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',
   ayarlar: '<circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M4.9 4.9l2.1 2.1m10 10 2.1 2.1M4.9 19.1 7 17m10-10 2.1-2.1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
 };
 const TABS = [
@@ -51,9 +54,13 @@ export const ctx = {
   quit() { ctx.state = null; render(); },
   act(action, prm) {
     const s = ctx.state;
+    const meId = s.player.partyId;
+    const bNat = s.lastProjection?.national?.[meId] ?? 0;
+    const bProv = prm.province ? s.lastProjection?.provinces?.[prm.province]?.shares?.[meId] ?? 0 : null;
     const res = withRng(s, rng => runAction(s, action, prm, rng));
     if (res.error) { toast(res.error); return null; }
     storeProjection(s);
+    res.impact = { nat: (s.lastProjection.national[meId] ?? 0) - bNat, prov: bProv === null ? null : (s.lastProjection.provinces[prm.province]?.shares?.[meId] ?? 0) - bProv, provName: prm.province ? PROVINCES.find(p => p.plate === +prm.province)?.name : '' };
     saveGame(s, 'oto');
     render();
     if (res.interactive === 'broadcast') showBroadcast(ctx, res.broadcast);
@@ -147,8 +154,12 @@ function ticker(s) {
   return `<div class="ticker" aria-label="Son dakika"><div class="tag">SON DAKİKA</div><div class="track"><div class="run">${items}</div></div></div>`;
 }
 
+function tabsFor(s) {
+  return s.player.isPresident ? TABS.map(t => t[0] === 'meclis' ? ['makam', 'Makam', renderPresidency] : t) : TABS;
+}
+
 function tabbar(s) {
-  return `<div class="tabbar"><nav>${TABS.map(([id, label]) => `<button data-tab="${id}" class="${ctx.tab === id ? 'on' : ''}" aria-label="${label}">
+  return `<div class="tabbar"><nav>${tabsFor(s).map(([id, label]) => `<button data-tab="${id}" class="${ctx.tab === id ? 'on' : ''}" aria-label="${label}">
     <svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[id]}</svg>${label}${id === 'gundem' && s.events.active.length ? '<span class="dot"></span>' : ''}</button>`).join('')}</nav></div>`;
 }
 
@@ -156,6 +167,8 @@ let lastTicker = '';
 function render() {
   const app = document.getElementById('app');
   const s = ctx.state;
+  playTrack(pickTrack());
+  duckMusic(!!document.querySelector('.tv'));
   if (!s) {
     app.innerHTML = '';
     const v = el('<main class="view" style="padding-bottom:32px"></main>');
@@ -175,12 +188,21 @@ function render() {
   app.querySelector('#btn-end').onclick = () => { sfx('whoosh'); ctx.endTurn(); };
   bindSoundToggle(app);
   app.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => ctx.go(b.dataset.tab));
-  const tab = TABS.find(t => t[0] === ctx.tab) || TABS[0];
+  const tab = tabsFor(s).find(t => t[0] === ctx.tab) || (ctx.tab === 'meclis' ? ['meclis', 'Meclis', renderParliament] : null) || TABS[0];
   tab[2](view, ctx);
   if (s.gameOver && !document.querySelector('.night')) showGameOver(s);
 }
 
+function pickTrack() {
+  const s = ctx.state;
+  if (!s) return 'menu';
+  if (s.player.isPresident) return 'president';
+  if (s.phase === 'campaign') return 'campaign';
+  return 'game';
+}
+
 export function boot() {
+  initMusic();
   globalThis.__sandik = ctx; // hata ayıklama ve otomatik testler için
   mountBackgroundMap();
   const saved = loadGame('oto');

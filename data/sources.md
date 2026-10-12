@@ -38,5 +38,11 @@ Haziran 2023 genel başkanları, YSK aday listesindeki parti başkanlarıdır. C
 - Canlı yayın programları, kanallar ve sunucular kurgusaldır (`data/tv.js`).
 - Gazeteler, yorumcular ve sosyal medyadaki vatandaşlar kurgusaldır (`data/press.js`); sosyal medya platform adları (TikTok, X, Facebook, Instagram, YouTube, WhatsApp, Spotify) gerçek markalardır ve yalnızca oyun içi tanımlama için kullanılır; markaların oyunla ilişkisi yoktur (`data/social.js`). Hükümet ve gerçek partilerin tepkileri doğrudan alıntı olmadan, oyun içi özet olarak verilir.
 
+## Hükümet gündemi, Cumhurbaşkanlığı, dış ilişkiler (tasarım / kısmen kaynaklı)
+- Hükümet politika havuzu (`data/policies.js`) **oyun içi senaryodur**; gerçek bir planı veya açıklamayı temsil etmez.
+- Cumhurbaşkanlığı seçimi: iki tur, salt çoğunluk; aday gösterme için %5 oy / grup ya da 100 bin seçmen imzası — Anayasa m.101 (kaynaklı, sadeleştirilmiş). Görev süresi: iki dönem (2018 ve 2023 seçimleri sayılır — **tahmini yorum**); bu nedenle oyunda 2028'de iktidar partisi yeni bir adayla yarışır.
+- Başlangıç politika faizi %15 (Haziran 2023 — tahmini). Dış ilişki puanları ve dünya gündemi tasarım varsayımıdır.
+- Bakan adayları, ekip çalışanları ve tartışma moderatörü kurgusaldır.
+
 ## Tasarım varsayımları
 Parti ideoloji konumları, seçmen kümeleri ve bunların payları (2023 oylarından türetilir), medya erişimi, lider karizması, bütçe kalemleri ve tüm denge katsayıları (`engine/params.js`) oyun tasarımıdır. Gerçek kişi veya kurumlar hakkında iddia içermez. Olay havuzundaki tüm olaylar kurgusaldır.

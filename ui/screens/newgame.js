@@ -9,6 +9,7 @@ import { newGame, generateFounders } from '../../engine/state.js';
 import { loadGame, slotInfo, SLOTS, deleteSlot } from '../../engine/save.js';
 import { soundToggleHtml, bindSoundToggle, sfx } from '../sound.js';
 import { sheet } from '../dom.js';
+import { audioSettingsHtml, bindAudioSettings } from '../audioSettings.js';
 import { fmtDate, pct } from '../../engine/util.js';
 import { LOOKS, PROFESSIONS, EDUCATION, TRAITS, randomCharacter } from '../../data/character.js';
 import { PROVINCES } from '../../data/generated/provinces.js';
@@ -112,6 +113,7 @@ export function renderNewGame(view, ctx) {
   view.querySelectorAll('[data-del]').forEach(b => b.onclick = () => confirmDelete(b.dataset.del, () => renderNewGame(view, ctx)));
   view.querySelectorAll('[data-howto]').forEach(b => b.onclick = () => { w.howto = !w.howto; renderNewGame(view, ctx); });
   bindSoundToggle(view);
+  view.querySelector('[data-a=audio]')?.addEventListener('click', () => { const sh = sheet(`<h2>Ses ve müzik</h2>${audioSettingsHtml()}`); bindAudioSettings(sh.root, { onChange: () => renderNewGame(view, ctx) }); });
   view.querySelectorAll('[data-year]').forEach(b => b.onclick = () => { w.year = b.dataset.year; renderNewGame(view, ctx); });
   view.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { w.mode = b.dataset.mode; renderNewGame(view, ctx); });
   view.querySelectorAll('[data-join]').forEach(b => b.onclick = () => { w.joinPartyId = b.dataset.join; renderNewGame(view, ctx); });
@@ -151,6 +153,8 @@ export function renderNewGame(view, ctx) {
   });
 }
 
+function pinColor() { return w.mode === 'join' ? (PARTIES_2023.find(p => p.id === w.joinPartyId)?.color || '#C8102E') : w.party.color; }
+
 function avatarBg() {
   const col = w.mode === 'join' ? (PARTIES_2023.find(p => p.id === w.joinPartyId)?.color || '#14213D') : w.party.color;
   return mixColor('#FFFFFF', col, 0.22);
@@ -169,7 +173,7 @@ function characterStep() {
   const provs = [...PROVINCES].sort((a, b) => a.name.localeCompare(b.name, 'tr'));
   return `<h1 style="font-size:30px">Karakterini oluştur</h1>
     <div class="charhead card">
-      <div id="char-preview" class="charportrait">${avatarSvg(c, { size: 132, bg: avatarBg() })}</div>
+      <div id="char-preview" class="charportrait">${avatarSvg(c, { size: 132, bg: avatarBg(), pin: c.pin !== false ? pinColor() : null })}</div>
       <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px">
         <label class="f">Ad soyad<input class="in" id="f-player" maxlength="30" value="${esc(w.playerName)}" placeholder="ör. Deniz Arslan" autocomplete="off"></label>
         <label class="f">Yaş <span class="muted" id="age-l">${c.age}</span><input type="range" id="f-age" min="30" max="78" value="${c.age}"></label>
@@ -183,9 +187,15 @@ function characterStep() {
       <div class="f">${female ? 'Saç / başörtüsü' : 'Saç modeli'}${chips('hairStyle', LOOKS.hairStyle[c.gender], c.hairStyle)}</div>
       ${c.hairStyle === 'basortu' ? `<div class="f">Başörtüsü rengi${swatches('scarf', LOOKS.scarf, c.scarf)}</div>` : `<div class="f">Saç rengi${swatches('hairColor', LOOKS.hairColor.map(h => h[0]), c.hairColor)}</div>`}
       ${!female ? `<div class="f">Sakal / bıyık${chips('facial', LOOKS.facial, c.facial)}</div>` : ''}
+      <div class="f">Göz rengi${swatches('eyeColor', LOOKS.eyeColor.map(e => e[0]), c.eyeColor)}</div>
+      <div class="f">Kaşlar${chips('brows', LOOKS.brows, c.brows || 'normal')}</div>
+      <div class="f">Burun${chips('nose', LOOKS.nose, c.nose || 'orta')}</div>
+      <div class="f">Dudaklar${chips('lips', LOOKS.lips, c.lips || 'orta')}</div>
       <div class="f">Gözlük${chips('glasses', LOOKS.glasses, c.glasses)}</div>
-      <div class="f">Takım elbise${swatches('suit', LOOKS.suit, c.suit)}</div>
+      <div class="f">Kıyafet${chips('outfit', LOOKS.outfit[c.gender], c.outfit || 'takim')}</div>
+      <div class="f">${c.outfit === 'gomlek' || c.outfit === 'bluz' ? 'Kıyafet rengi' : 'Ceket rengi'}${swatches('suit', LOOKS.suit, c.suit)}</div>
       <div class="f">${female ? 'Bluz / aksesuar' : 'Kravat'}${swatches('accent', LOOKS.accent, c.accent)}</div>
+      <label class="aset-row" style="font-size:13px"><span>Yakada parti rozeti</span><input type="checkbox" id="f-pin" ${c.pin !== false ? 'checked' : ''}></label>
     </section>
     <section class="card charsec"><h2>Kimlik</h2>
       <label class="f">Memleket <span class="muted" style="font-weight:400">· memleketinde miting ve delege görüşmeleri daha etkili</span>
@@ -203,10 +213,11 @@ function characterStep() {
 function bindCharacter(view, ctx, go) {
   const c = w.character;
   const rerender = () => { const y = window.scrollY; renderNewGame(view, ctx); window.scrollTo(0, y); };
-  const preview = () => { const el = view.querySelector('#char-preview'); if (el) el.innerHTML = avatarSvg(c, { size: 132, bg: avatarBg() }); };
+  const preview = () => { const el = view.querySelector('#char-preview'); if (el) el.innerHTML = avatarSvg(c, { size: 132, bg: avatarBg(), pin: c.pin !== false ? pinColor() : null }); };
   view.querySelector('#f-player').addEventListener('input', e => { w.playerName = e.target.value.trim(); });
   view.querySelector('#f-age').addEventListener('input', e => { c.age = +e.target.value; view.querySelector('#age-l').textContent = c.age; preview(); });
   view.querySelector('#f-home').addEventListener('change', e => { c.hometown = +e.target.value; });
+  view.querySelector('#f-pin')?.addEventListener('change', e => { c.pin = e.target.checked; preview(); });
   view.querySelectorAll('[data-ch]').forEach(b => b.onclick = () => {
     const key = b.dataset.ch, v = b.dataset.v;
     c[key] = v;
@@ -214,6 +225,7 @@ function bindCharacter(view, ctx, go) {
       const styles = LOOKS.hairStyle[v].map(h => h[0]);
       if (!styles.includes(c.hairStyle)) c.hairStyle = styles[0];
       if (v === 'k') c.facial = 'yok';
+      if (!LOOKS.outfit[v].some(o => o[0] === c.outfit)) c.outfit = 'takim';
     }
     rerender();
   });
@@ -298,7 +310,7 @@ function splashHtml() {
     ['Seçim gecesi', '%7 barajı geç, sandalye kazan, iktidarı hedefle.'],
   ];
   return `<section class="splash"><div class="stripe" aria-hidden="true"></div>
-      <div class="row" style="justify-content:space-between;align-items:flex-start"><div class="eyebrow" style="color:var(--hi)">Siyasi simülasyon · Türkiye</div>${soundToggleHtml()}</div>
+      <div class="row" style="justify-content:space-between;align-items:flex-start"><div class="eyebrow" style="color:var(--hi)">Siyasi simülasyon · Türkiye</div><div class="row" style="gap:6px;position:relative;z-index:2">${soundToggleHtml()}<button class="snd-toggle" type="button" data-a="audio" aria-label="Ses ve müzik ayarları" title="Ses ve müzik ayarları">⚙️</button></div></div>
       <h1>Sandık<br><em>ve</em> Kürsü</h1>
       <p>Parti kur ya da bir partinin başına geç. 81 il, 600 sandalye, %7 baraj. Küçük başlamak neredeyse umutsuz; iktidar ise çok uzak.</p>
       ${splashMap()}

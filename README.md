@@ -2,7 +2,8 @@
 
 Mobil öncelikli, tarayıcıda çalışan siyasi simülasyon. Yeni bir parti kurarsın ya da gerçek bir partinin kurultayını kazanıp genel başkan olursun. Hedef baraj, meclis ve iktidar.
 
-**Durum: Aşama 1.8.** 2023 başlangıcı, 81 il haritası, iki oyun modu, haftalık tur, milletvekili seçimi, kural tabanlı rakip yapay zekâsı.
+**Durum: Aşama 2.0.** 2023 başlangıcı, 81 il haritası, iki oyun modu, haftalık tur, milletvekili seçimi, kural tabanlı rakip yapay zekâsı.
+Hükümet gündemi ve bülten soruları, dinamik konuşmalar, ekip (danışmanlar), siyasi ziyaretler ve dış temaslar, dış ilişkiler göstergesi, Cumhurbaşkanlığı seçimi ve makam ekranları (kabine, ekonomi, kanunlar, zirveler), müzik ve ses ayarları, gölgelendirmeli karakter portreleri.
 Sesli efektler (aç/kapa), ayrıntılı miting (mekân, konuşma metni, lojistik, hava durumu, rakip çakışması), liderler tartışması, yeniden tasarlanmış açılış ekranı ve kayıt silme.
 Kampanya animasyonları (miting, ziyaret, teşkilat, bağış, kongre, kurultay eylemleri), 9 ayrı sosyal medya kampanyası (farklı hedef kitleler, haftalar süren etki, izlenme panosu), basın açıklamasında gazete manşetleri, halk, hükümet ve rakip tepkileri, yeniden tasarlanmış canlı TV stüdyosu.
 Ek olarak: ayrıntılı karakter oluşturma (görünüm, meslek, memleket, kişilik), hizip bazlı zorlu kurultay (imza şartı, iki tur, canlı sayım), canlı TV yayını (cevaplar delege oyunu anlık değiştirir), arka planda 2023 seçim haritası.

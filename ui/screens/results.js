@@ -47,6 +47,7 @@ function playerVerdict(s, r) {
 
 export function showResult(s, r, done) {
   if (r.type === 'kurultay') { showKurultay(s, r, done); return; }
+  if (r.type === 'cb') { showPresidential(s, r, done); return; }
   if (r.type === 'yerel') {
     const o = overlay(`<span class="live">YEREL SEÇİM</span><h1>Belediye başkanlıkları</h1><div id="m"></div>
       <div class="card"><div class="small muted" style="margin-bottom:6px">İl/büyükşehir belediye başkanlıkları (basitleştirilmiş: ilçe ve meclisler Aşama 6'da)</div>
@@ -179,4 +180,37 @@ function showKurultay(s, r, done) {
       setTimeout(() => { o.querySelector('#kt').textContent = '2. tur oylaması'; animate(r.rounds[1], final); }, reduced ? 0 : 1400);
     } else final();
   });
+}
+
+// Cumhurbaşkanlığı seçimi sonuç ekranı (1. ve gerekirse 2. tur)
+function showPresidential(s, r, done) {
+  const byId = Object.fromEntries(r.candidates.map(c => [c.id, c]));
+  const o = overlay(`<div class="row" style="justify-content:space-between"><span class="live">● CANLI · CUMHURBAŞKANLIĞI SEÇİMİ</span><span class="counter" id="pt"></span></div>
+    <h1 id="ph">1. tur sonuçları</h1><div id="pm"></div><div class="card" id="pb"></div><div id="pf"></div>`);
+  const m = createMap();
+  m.setInteractive(false);
+  o.querySelector('#pm').appendChild(m.node);
+  const draw = (round, label) => {
+    o.querySelector('#ph').textContent = label;
+    m.paint(pl => byId[round.provinces[pl]]?.color);
+    o.querySelector('#pb').innerHTML = Object.entries(round.shares).sort((a, b) => b[1] - a[1]).map(([id, v]) => { const c = byId[id];
+      return `<div style="margin:8px 0"><div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:8px">
+        ${c.isPlayer ? `<div class="portrait" style="width:36px;height:42px">${avatarSvg(s.player.character, { size: 36, bg: '#E6EBF3' })}</div>` : `<span class="badge" style="background:${c.color}">${esc(c.short)}</span>`}
+        <b style="flex:1;color:${c.isPlayer ? 'var(--accent)' : 'var(--ink)'}">${esc(c.name)}</b><span class="num" style="font-family:var(--f-display);font-size:22px;font-weight:700">%${(100 * v).toFixed(1).replace('.', ',')}</span></div>
+        <div class="kbar" style="height:14px"><div style="width:${100 * v}%;background:${c.color}"></div><i style="left:50%"></i></div></div>`; }).join('');
+  };
+  sfx('drumroll', 0, 2);
+  draw(r.rounds[0], '1. tur sonuçları');
+  const final = () => {
+    const w = byId[r.winner];
+    sfx(r.playerWon ? 'win' : r.playerRan ? 'lose' : 'ding');
+    o.querySelector('#pf').innerHTML = `<div class="card"><div class="eyebrow">Yeni Cumhurbaşkanı</div><h2>${esc(w.name)}</h2>
+      <p style="margin:0">${r.playerWon ? 'Tebrikler! Artık Cumhurbaşkanısın. Alt menüdeki <b>Makam</b> sekmesinden kabineni kur, ekonomiyi ve dış politikayı yönet. Onay oranını yüksek tut; beş yıl sonra yeniden seçime gideceksin.' : r.playerRan ? 'Bu sefer olmadı. Muhalefet liderliğini sürdürerek bir sonraki seçime hazırlanabilirsin.' : `${esc(w.short)} ittifakı hükümeti kuracak.`}</p></div>
+      <button class="btn-end" style="padding:14px;width:100%" data-a="ok">Devam</button>`;
+    o.querySelector('[data-a=ok]').onclick = () => { o.remove(); ctx.render(); done(); };
+  };
+  if (r.rounds.length > 1) {
+    o.querySelector('#pt').textContent = 'Kimse %50\'yi geçemedi';
+    setTimeout(() => { draw(r.rounds[1], '2. tur sonuçları (iki hafta sonra)'); sfx('drumroll', 0, 1.5); setTimeout(final, 1700); }, 2600);
+  } else setTimeout(final, 1500);
 }

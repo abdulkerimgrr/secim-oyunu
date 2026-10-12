@@ -207,5 +207,5 @@ export const NEWS_TEMPLATES = {
   rally: ['{party}, {prov} mitinginde ekonomiye vurgu yaptı', '{party} {provLoc} meydanı doldurdu', '{party} lideri {provLoc} vatandaşlarla buluştu'],
   tv: ['{party} lideri canlı yayında gündemi değerlendirdi', '{party}: "Önceliğimiz hayat pahalılığı"'],
   attackGov: ['{party} hükümetin ekonomi politikasını eleştirdi'],
-  attackPlayer: ['{party} çevrelerinden yeni hareket {target} hakkında eleştiri', '{party}, {target} cephesinin ekonomi önerilerini hedef aldı'],
+  attackPlayer: ['{party} çevrelerinden {target} hakkında eleştiri', '{party}, {target} cephesinin ekonomi önerilerini hedef aldı'],
 };

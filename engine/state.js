@@ -14,6 +14,7 @@ import { computeSeats } from './election.js';
 import { initKurultay, recalcSupport } from './kurultay.js';
 import { charMod } from './character.js';
 import { randomCharacter } from '../data/character.js';
+import { ensureGovState } from './government.js';
 
 export const PLAYER_ID = 'OYUNCU';
 export const SAVE_VERSION = 2;
@@ -95,7 +96,7 @@ export function newGame(opts) {
     parties: {}, alliances: deepClone(ALLIANCES_2023),
     units, camp: {}, newPartyE: 0, turnoutShift: 0,
     economy: { ...scenario.economy, misery0: 0, history: [] },
-    government: [...scenario.government], president: scenario.president,
+    government: [...scenario.government], president: scenario.president, presidentTerms: 2, // 2018 ve 2023 seçimleri (2017 anayasa değişikliği sonrası) — tahmini yorum
     polls: [], news: [], events: { active: [], seen: {}, history: [] },
     parliament: { seats: {}, date: '2023-05-14' }, elections: [], mayors: {},
     adapt: { types: {}, provs: {} }, intel: 0, ballotSecurity: 0.3,
@@ -104,6 +105,7 @@ export function newGame(opts) {
     player: null,
   };
   state.economy.misery0 = misery(state.economy);
+  ensureGovState(state);
   for (const def of PARTIES_2023) state.parties[def.id] = makeParty(def, scenario, provShares);
   calibrate(state, targets);
 
@@ -159,6 +161,7 @@ export function newGame(opts) {
     state.player.personalMoney = Math.round(1_500_000 * diff.money * charMod(state, 'money'));
     party.isPlayer = true;
   }
+  character.pinColor = state.parties[state.player.partyId].color;
   state.player.ap = state.player.apMax;
   state.player.difficulty = state.difficulty;
 

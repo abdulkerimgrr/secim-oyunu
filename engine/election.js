@@ -3,6 +3,7 @@ import { dhondt } from './dhondt.js';
 import { project, allianceShare } from './model.js';
 import { K, DIFFICULTY } from './params.js';
 import { REGION_NAMES } from './regions.js';
+import { runPresidential } from './presidential.js';
 
 export function thresholdStatus(state, national) {
   const thr = state.rules.parliament.threshold;
@@ -86,6 +87,9 @@ export function runGeneralElection(state, rng) {
   state.camp = {};
   state.economy.misery0 = state.economy.inflation + 2 * state.economy.unemployment; // yeni dönem: beklentiler sıfırlanır
   state.elections.push({ date: result.date, type: 'genel', national: result.national, seats });
+  // Aynı gün cumhurbaşkanlığı seçimi (hükümeti cumhurbaşkanının ittifakı kurar)
+  result.cb = runPresidential(state, rng, pr);
+  if (result.cb) result.government = state.government.slice();
   return result;
 }
 

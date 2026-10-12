@@ -5,6 +5,7 @@ import { DIFFICULTY } from './params.js';
 import { clamp, addDays } from './util.js';
 import { charMod } from './character.js';
 import { addNews } from './news.js';
+import { staffMod } from './staff.js';
 
 export const campaignDef = id => SOCIAL_CAMPAIGNS.find(c => c.id === id);
 
@@ -19,9 +20,9 @@ export function launchCampaign(state, def, prm, rng, fatigueMul = 1) {
   const p = state.parties[state.player.partyId];
   const diff = DIFFICULTY[state.difficulty] || DIFFICULTY.zor;
   const dig = state.player.mode === 'found' ? Math.max(0, ...(p.founders || []).filter(f => f.skill === 'dijital').map(f => f.level)) : 0.4;
-  const viral = def.viral ? rng.chance(def.viral * (1 + dig) * (state.player.character?.traits?.includes('medyatik') ? 1.3 : 1)) : false;
-  const backfire = !viral && def.backfire ? rng.chance(def.backfire * charMod(state, 'gaffe')) : false;
-  const mult = (viral ? 2.5 : backfire ? 0.3 : rng.range(0.75, 1.25)) * diff.effect * fatigueMul;
+  const viral = def.viral ? rng.chance(def.viral * (1 + dig) * (state.player.character?.traits?.includes('medyatik') ? 1.3 : 1) * staffMod(state, 'viral')) : false;
+  const backfire = !viral && def.backfire ? rng.chance(def.backfire * charMod(state, 'gaffe') * staffMod(state, 'backfire')) : false;
+  const mult = (viral ? 2.5 : backfire ? 0.3 : rng.range(0.75, 1.25)) * diff.effect * fatigueMul * staffMod(state, 'social');
   const c = {
     uid: `${def.id}-${state.turn}-${Math.floor(rng.next() * 1e4)}`, id: def.id, start: state.date,
     weeksTotal: def.weeks, weeksLeft: def.weeks, mult, viral, backfire, province: prm.province || null,

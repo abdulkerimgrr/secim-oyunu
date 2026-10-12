@@ -3,9 +3,12 @@ import { esc, sheet, toast } from '../dom.js';
 import { saveGame, loadGame, slotInfo, deleteSlot, exportState, importState, SLOTS } from '../../engine/save.js';
 import { DIFFICULTY } from '../../engine/params.js';
 import { fmtDate } from '../../engine/util.js';
+import { audioSettingsHtml, bindAudioSettings } from '../audioSettings.js';
 
 export function renderSettings(view, ctx) {
   const s = ctx.state;
+  view.insertAdjacentHTML('beforeend', `<section class="card"><h2>Ses ve müzik</h2>${audioSettingsHtml()}<p class="small muted" style="margin:8px 0 0">Müzik ve efektler cihazında anlık üretilir; internet gerekmez. Tarayıcılar sesi ilk dokunuştan sonra açar.</p></section>`);
+  bindAudioSettings(view, { onChange: () => ctx.render() });
   view.insertAdjacentHTML('beforeend', `<section class="card"><h2>Kayıtlar <small>bu tarayıcıda saklanır</small></h2>
     <p class="small muted" style="margin:0 0 6px">Oyun her eylem ve turdan sonra otomatik kaydedilir.</p>
     <div class="list">${SLOTS.map(sl => { const i = slotInfo(sl); return `<div class="li"><div class="grow"><div class="t">${sl === 'oto' ? 'Otomatik kayıt' : 'Yuva ' + sl}</div><div class="small muted">${i ? `${esc(i.party)} · ${esc(i.name)} · ${fmtDate(i.date)}` : 'Boş'}</div></div>

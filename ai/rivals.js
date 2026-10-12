@@ -26,7 +26,7 @@ export function rivalsAct(state, rng, scale = 1) {
     if (p.dissolved || p.aggregate || (p.isPlayer && myIsLeader) || p.resources <= 0) continue;
     const n = Math.max(0, Math.round((p.resources * 0.8 + rng.range(-0.3, 0.6)) * diff.rival * scale + (rng.next() < (scale % 1) ? 1 : 0)));
     const isOpp = !state.government.includes(p.id);
-    const threat = myIsLeader && me.id !== p.id && myPoll > 0.02 && ideologyDistance(p.ideology, me.ideology) < 0.75;
+    const threat = myIsLeader && me.id !== p.id && myPoll > 0.02 && ideologyDistance(p.ideology, me.ideology) < 0.75 && rng.next() > (state.relations?.[p.id] || 0) / 150;
     for (let i = 0; i < n; i++) {
       const r = rng.next();
       const eff = (0.6 + 0.4 * p.media) * diff.rival;

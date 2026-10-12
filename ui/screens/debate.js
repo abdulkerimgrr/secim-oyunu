@@ -9,7 +9,7 @@ import { saveGame } from '../../engine/save.js';
 import { storeProjection } from '../../engine/polls.js';
 import { playerParty } from '../../engine/state.js';
 import { randomCharacter } from '../../data/character.js';
-import { sfx } from '../sound.js';
+import { sfx, duckMusic } from '../sound.js';
 
 const SECONDS = 30;
 function seeded(seed) { let s = seed % 2147483647 || 7; return () => (s = (s * 16807) % 2147483647) / 2147483647; }
@@ -86,8 +86,9 @@ export function showDebate(ctx, d) {
     body.innerHTML = `<div class="tv-react ${res.won ? 'up' : 'down'}"><b>${res.won ? 'Tartışmayı sen kazandın!' : `Tartışmanın galibi: ${esc(s.parties[res.top]?.short || '')}`}</b>
       <span>İzleyicilerin %${Math.round(100 * res.shares.me)}'i seni daha başarılı buldu. Bu sonuç önümüzdeki günlerin anketlerine yansıyacak.</span></div>
       <button class="btn-end tv-next" id="db-close">Stüdyodan çık</button>`;
-    $('#db-close').onclick = () => { o.remove(); ctx.render(); };
+    $('#db-close').onclick = () => { o.remove(); duckMusic(false); ctx.render(); };
   };
   sfx('jingle');
+  duckMusic(true);
   setTimeout(ask, 900);
 }

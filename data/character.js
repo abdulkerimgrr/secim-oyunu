@@ -14,6 +14,11 @@ export const LOOKS = {
   suit: ['#1F2A44', '#2D2D2D', '#3B4A5E', '#5A4636', '#6B6F76', '#1E3D33'],
   accent: ['#B3202E', '#1F5FA8', '#2F7A4A', '#C79A2B', '#6B3FA0', '#E0E0E0'],
   scarf: ['#B3202E', '#1F5FA8', '#2F7A4A', '#C79A2B', '#6B3FA0', '#D8C7B0'],
+  eyeColor: [['#5B3A1E', 'Kahverengi'], ['#2B1B10', 'Koyu kahve'], ['#6E7B3A', 'Ela'], ['#3E7CA6', 'Mavi'], ['#4E8A5A', 'Yeşil'], ['#6B6F76', 'Gri']],
+  brows: [['ince', 'İnce'], ['normal', 'Normal'], ['kalin', 'Kalın'], ['catik', 'Çatık']],
+  nose: [['kucuk', 'Küçük'], ['orta', 'Orta'], ['buyuk', 'Belirgin']],
+  lips: [['ince', 'İnce'], ['orta', 'Orta'], ['dolgun', 'Dolgun']],
+  outfit: { e: [['takim', 'Takım + kravat'], ['acikyaka', 'Takım, açık yaka'], ['gomlek', 'Gömlek'], ['kazak', 'Kazak']], k: [['takim', 'Döpiyes'], ['bluz', 'Bluz'], ['kazak', 'Kazak']] },
 };
 
 export const PROFESSIONS = [
@@ -54,6 +59,8 @@ export function randomCharacter(rnd = Math.random) {
     facial: gender === 'e' ? pick(LOOKS.facial)[0] : 'yok',
     glasses: rnd() < 0.35 ? pick(LOOKS.glasses.slice(1))[0] : 'yok',
     suit: pick(LOOKS.suit), accent: pick(LOOKS.accent), scarf: pick(LOOKS.scarf),
+    eyeColor: pick(LOOKS.eyeColor)[0], brows: pick(LOOKS.brows)[0], nose: pick(LOOKS.nose)[0], lips: pick(LOOKS.lips)[0],
+    outfit: 'takim', pin: true,
     profession: pick(PROFESSIONS).id, education: pick(EDUCATION)[0], hometown: 1 + Math.floor(rnd() * 81),
     traits: [],
   };

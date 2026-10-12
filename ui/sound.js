@@ -1,33 +1,57 @@
-// Ses efektleri: Web Audio ile anlık sentezlenir (ses dosyası yok, internetsiz çalışır).
-// Tarayıcılar sesi ilk dokunuştan sonra açar. Tercih tarayıcıda saklanır.
-const KEY = 'secim-oyunu:ses';
-let ctx = null, master = null;
-let muted = (() => { try { return localStorage.getItem(KEY) === 'kapali'; } catch { return false; } })();
+// Ses efektleri ve müzik ayarları. Web Audio ile anlık sentezlenir (dosya yok, internetsiz çalışır).
+const KEY = 'secim-oyunu:ayarlar';
+const DEFAULTS = { master: true, sfx: true, sfxVol: 0.7, music: true, musicVol: 0.4 };
+let settings = (() => {
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (s) return { ...DEFAULTS, ...s };
+    if (localStorage.getItem('secim-oyunu:ses') === 'kapali') return { ...DEFAULTS, master: false };
+  } catch { /* yok say */ }
+  return { ...DEFAULTS };
+})();
+let ctx = null, master = null, sfxGain = null, musicGain = null;
+const listeners = new Set();
 
-export const isMuted = () => muted;
-export function setMuted(v) {
-  muted = v;
-  try { localStorage.setItem(KEY, v ? 'kapali' : 'acik'); } catch { /* yok say */ }
-  if (master) master.gain.value = v ? 0 : 0.55;
+export const getSettings = () => ({ ...settings });
+export const isMuted = () => !settings.master;
+export function setSetting(k, v) {
+  settings[k] = v;
+  try { localStorage.setItem(KEY, JSON.stringify(settings)); } catch { /* yok say */ }
+  applyGains();
+  listeners.forEach(fn => fn(settings));
 }
+export function onSettings(fn) { listeners.add(fn); }
+export function setMuted(v) { setSetting('master', !v); }
 
-function ac() {
-  if (muted) return null;
+function applyGains() {
+  if (!ctx) return;
+  master.gain.value = settings.master ? 1 : 0;
+  sfxGain.gain.value = settings.sfx ? 0.6 * settings.sfxVol : 0;
+  musicGain.gain.setTargetAtTime(settings.music ? 0.5 * settings.musicVol * (duck ? 0.25 : 1) : 0, ctx.currentTime, 0.3);
+}
+let duck = false;
+export function duckMusic(v) { duck = v; applyGains(); }
+
+export function audioCtx() {
   try {
     if (!ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return null;
       ctx = new AC();
-      master = ctx.createGain();
-      master.gain.value = 0.55;
-      master.connect(ctx.destination);
+      master = ctx.createGain(); master.connect(ctx.destination);
+      sfxGain = ctx.createGain(); sfxGain.connect(master);
+      musicGain = ctx.createGain(); musicGain.connect(master);
+      applyGains();
     }
     if (ctx.state === 'suspended') ctx.resume();
     return ctx;
   } catch { return null; }
 }
+export const musicOut = () => (audioCtx(), musicGain);
 
-function tone(freq, t0, dur, { type = 'sine', vol = 0.3, slide = 0, attack = 0.01 } = {}) {
+function ac() { if (!settings.master || !settings.sfx) return null; return audioCtx(); }
+
+function tone(freq, t0, dur, { type = 'sine', vol = 0.3, slide = 0, attack = 0.01, out } = {}) {
   const o = ctx.createOscillator(), g = ctx.createGain();
   o.type = type;
   o.frequency.setValueAtTime(freq, t0);
@@ -35,12 +59,13 @@ function tone(freq, t0, dur, { type = 'sine', vol = 0.3, slide = 0, attack = 0.0
   g.gain.setValueAtTime(0, t0);
   g.gain.linearRampToValueAtTime(vol, t0 + attack);
   g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-  o.connect(g); g.connect(master);
+  o.connect(g); g.connect(out || sfxGain);
   o.start(t0); o.stop(t0 + dur + 0.05);
 }
+export { tone as synthTone };
 
 let noiseBuf = null;
-function noise(t0, dur, { vol = 0.2, freq = 1200, q = 0.8, type = 'bandpass', attack = 0.005 } = {}) {
+export function noise(t0, dur, { vol = 0.2, freq = 1200, q = 0.8, type = 'bandpass', attack = 0.005, out } = {}) {
   if (!noiseBuf) {
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 1, ctx.sampleRate);
     const d = noiseBuf.getChannelData(0);
@@ -52,18 +77,18 @@ function noise(t0, dur, { vol = 0.2, freq = 1200, q = 0.8, type = 'bandpass', at
   g.gain.setValueAtTime(0, t0);
   g.gain.linearRampToValueAtTime(vol, t0 + attack);
   g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-  src.connect(f); f.connect(g); g.connect(master);
+  src.connect(f); f.connect(g); g.connect(out || sfxGain);
   src.start(t0); src.stop(t0 + dur + 0.05);
 }
 
 const SFX = {
   click(t) { tone(880, t, 0.05, { type: 'triangle', vol: 0.12 }); },
   ping(t) { tone(1320, t, 0.18, { vol: 0.18 }); tone(1760, t + 0.07, 0.22, { vol: 0.12 }); },
-  sting(t) { // son dakika jingle
+  sting(t) {
     tone(523, t, 0.16, { type: 'square', vol: 0.12 }); tone(659, t + 0.12, 0.16, { type: 'square', vol: 0.12 });
     tone(784, t + 0.24, 0.35, { type: 'square', vol: 0.14 }); tone(196, t, 0.6, { type: 'sawtooth', vol: 0.08 });
   },
-  jingle(t) { // TV program jeneriği
+  jingle(t) {
     [392, 523, 659, 784, 1047].forEach((f, i) => tone(f, t + i * 0.11, 0.4, { type: 'triangle', vol: 0.16 }));
     tone(131, t, 1.0, { type: 'sawtooth', vol: 0.1 }); noise(t + 0.5, 0.6, { vol: 0.08, freq: 6000, type: 'highpass' });
   },
@@ -94,14 +119,15 @@ export function sfx(name, delay = 0, ...args) {
 }
 
 export function soundToggleHtml() {
-  return `<button class="snd-toggle" type="button" data-sound aria-label="${muted ? 'Sesi aç' : 'Sesi kapat'}" title="${muted ? 'Sesi aç' : 'Sesi kapat'}">${muted ? '🔇' : '🔊'}</button>`;
+  const m = !settings.master;
+  return `<button class="snd-toggle" type="button" data-sound aria-label="${m ? 'Sesi aç' : 'Sesi kapat'}" title="${m ? 'Sesi aç' : 'Sesi kapat'}">${m ? '🔇' : '🔊'}</button>`;
 }
 export function bindSoundToggle(root) {
   root.querySelectorAll('[data-sound]').forEach(b => b.onclick = e => {
     e.stopPropagation();
-    setMuted(!muted);
-    b.textContent = muted ? '🔇' : '🔊';
-    b.setAttribute('aria-label', muted ? 'Sesi aç' : 'Sesi kapat');
-    if (!muted) sfx('ping');
+    setSetting('master', !settings.master);
+    b.textContent = settings.master ? '🔊' : '🔇';
+    b.setAttribute('aria-label', settings.master ? 'Sesi kapat' : 'Sesi aç');
+    if (settings.master) sfx('ping');
   });
 }

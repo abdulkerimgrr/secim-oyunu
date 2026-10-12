@@ -48,3 +48,21 @@ export function fmtMoneyShort(x) {
   if (x >= 1e3) return `${s}₺${Math.round(x / 1e3)} B`;
   return `${s}₺${Math.round(x)}`;
 }
+
+function lastVowel(name) {
+  const vowels = 'aeıioöuüâîû';
+  let last = 'a';
+  for (const ch of name.toLocaleLowerCase('tr')) if (vowels.includes(ch)) last = ch;
+  return last === 'â' ? 'a' : last === 'î' ? 'i' : last === 'û' ? 'u' : last;
+}
+const endsVowel = name => 'aeıioöuüâîû'.includes(name.toLocaleLowerCase('tr').slice(-1));
+// İlgi eki: İstanbul'un, Trabzon'un, Rize'nin, Kahramanmaraş'ın
+export function gen(name) {
+  const v = { a: 'ı', ı: 'ı', e: 'i', i: 'i', o: 'u', u: 'u', ö: 'ü', ü: 'ü' }[lastVowel(name)];
+  return `${name}'${endsVowel(name) ? 'n' : ''}${v}n`;
+}
+// Yönelme eki: İstanbul'a, Rize'ye, İzmir'e, Ankara'ya
+export function dat(name) {
+  const v = 'aıou'.includes(lastVowel(name)) ? 'a' : 'e';
+  return `${name}'${endsVowel(name) ? 'y' : ''}${v}`;
+}
