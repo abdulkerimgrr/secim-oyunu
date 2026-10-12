@@ -15,6 +15,10 @@ import { renderParliament } from './screens/parliament.js';
 import { renderSettings } from './screens/settings.js';
 import { renderNewGame } from './screens/newgame.js';
 import { showResult, showGameOver } from './screens/results.js';
+import { showBroadcast } from './screens/broadcast.js';
+import { mountBackgroundMap } from './bgmap.js';
+import { avatarSvg } from './avatar.js';
+import { mixColor } from './map.js';
 
 const ICONS = {
   harita: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Zm0 0v14m6-12v14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',
@@ -50,6 +54,7 @@ export const ctx = {
     storeProjection(s);
     saveGame(s, 'oto');
     render();
+    if (res.interactive === 'broadcast') showBroadcast(ctx, res.broadcast);
     return res;
   },
   endTurn() {
@@ -85,7 +90,12 @@ function testAssist(s) {
     for (const pv of PROVINCES.slice(0, 45)) if (!me.orgs[pv.plate]) me.orgs[pv.plate] = 0.15;
     if (!me.congressDate) me.congressDate = s.date;
   }
-  if (s.player.mode === 'join' && !s.player.isLeader) s.player.kurultay.support = Math.max(s.player.kurultay.support, 55);
+  if (s.player.mode === 'join' && !s.player.isLeader) {
+    const k = s.player.kurultay;
+    for (const f of k.factions) f.support = Math.max(f.support, 62);
+    k.signatures = Math.max(k.signatures, 30);
+    k.support = k.factions.reduce((a, f) => a + f.weight * f.support, 0);
+  }
 }
 
 function doEnd() {
@@ -119,11 +129,11 @@ function topbar(s) {
   const money = pre ? s.player.personalMoney : me.money;
   const pips = Array.from({ length: s.player.apMax > 5 ? s.player.apMax : (s.phase === 'campaign' ? 3 : s.player.apMax) }, (_, i) => `<i class="${i < s.player.ap ? 'on' : ''}"></i>`).join('');
   const days = daysBetween(s.date, s.nextElection);
-  return `<header class="topbar">
-    <div><div class="date num">${fmtDate(s.date)}</div><div class="sub">${s.phase === 'campaign' ? `Kampanya · seçime ${days} gün` : `Seçime ${Math.ceil(days / 7)} hafta`} · ${esc(fmtMoney(money))}</div></div>
-    <div class="spacer"></div>
+  const av = s.player.character ? `<div class="topav">${avatarSvg(s.player.character, { size: 36, bg: mixColor('#FFFFFF', me.color, 0.3) })}</div>` : '';
+  return `<header class="topbar">${av}
+    <div class="tb-main"><div class="date num">${fmtDate(s.date)}</div><div class="sub">${s.phase === 'campaign' ? `Seçime ${days} gün` : `Seçime ${Math.ceil(days / 7)} hf`} · ${esc(fmtMoney(money))}</div></div>
     <div title="Eylem puanı"><div class="ap">${pips}</div><div class="sub" style="text-align:right">${s.player.ap} puan</div></div>
-    <button class="btn-end" id="btn-end">${s.phase === 'campaign' ? 'Günü bitir' : 'Turu bitir'}</button>
+    <button class="btn-end" id="btn-end">${s.phase === 'campaign' ? 'Günü bitir' : 'Bitir ▸'}</button>
   </header>`;
 }
 
@@ -165,6 +175,7 @@ function render() {
 }
 
 export function boot() {
+  mountBackgroundMap();
   const saved = loadGame('oto');
   ctx.saved = !!saved;
   render();

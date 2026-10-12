@@ -6,6 +6,10 @@ import { playerParty } from '../../engine/state.js';
 import { eligibility, weeklyBudget, treasuryAid } from '../../engine/turn.js';
 import { fmtMoney, pct, fmtInt, fmtDate } from '../../engine/util.js';
 import { pollTrend } from '../charts.js';
+import { avatarSvg } from '../avatar.js';
+import { mixColor } from '../map.js';
+import { PROFESSIONS, TRAITS, EDUCATION } from '../../data/character.js';
+import { PROVINCE_BY_PLATE } from '../../engine/state.js';
 
 export function renderParty(view, ctx) {
   const s = ctx.state;
@@ -22,6 +26,14 @@ export function renderParty(view, ctx) {
       <div class="stat"><div class="v">${me.seats}</div><div class="l">Milletvekili</div></div></div>
     ${me.alliance ? `<p class="small" style="margin:8px 0 0">İttifak: <b>${esc(s.alliances[me.alliance]?.name)}</b></p>` : ''}
     ${pre ? `<p class="small muted" style="margin:8px 0 0">Henüz genel başkan değilsin; parti yönetimi mevcut liderde. Kişisel bütçen: <b>${fmtMoney(s.player.personalMoney)}</b>.</p>` : ''}</section>`);
+
+  const c = s.player.character;
+  if (c) view.insertAdjacentHTML('beforeend', `<section class="card"><h2>${pre ? 'Aday profili' : 'Genel başkan'}</h2>
+    <div class="row" style="flex-wrap:nowrap;align-items:flex-start"><div class="portrait">${avatarSvg(c, { size: 96, bg: mixColor('#FFFFFF', me.color, 0.25) })}</div>
+    <dl class="kv" style="flex:1"><dt>Ad</dt><dd>${esc(s.player.name)}</dd><dt>Yaş</dt><dd>${c.age}</dd><dt>Memleket</dt><dd>${esc(PROVINCE_BY_PLATE[c.hometown]?.name || '')}</dd>
+      <dt>Meslek</dt><dd>${esc(PROFESSIONS.find(p => p.id === c.profession)?.label || '')}</dd><dt>Eğitim</dt><dd>${esc(EDUCATION.find(e => e[0] === c.education)?.[1] || '')}</dd></dl></div>
+    ${c.traits.length ? `<div class="row" style="margin-top:8px">${c.traits.map(t => { const x = TRAITS.find(y => y.id === t); return `<span class="pill good" title="${esc(x.desc)}">${esc(x.label)}</span><span class="small muted">${esc(x.desc)}</span>`; }).join('')}</div>` : ''}
+    <p class="small muted" style="margin:8px 0 0">${esc(PROFESSIONS.find(p => p.id === c.profession)?.desc || '')}</p></section>`);
 
   if (s.player.mode === 'found') {
     const el = eligibility(s);

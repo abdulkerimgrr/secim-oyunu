@@ -2,7 +2,8 @@
 
 Mobil öncelikli, tarayıcıda çalışan siyasi simülasyon. Yeni bir parti kurarsın ya da gerçek bir partinin kurultayını kazanıp genel başkan olursun. Hedef baraj, meclis ve iktidar.
 
-**Durum: Aşama 1 (MVP).** 2023 başlangıcı, 81 il haritası, iki oyun modu, haftalık tur, milletvekili seçimi, kural tabanlı rakip yapay zekâsı.
+**Durum: Aşama 1.5.** 2023 başlangıcı, 81 il haritası, iki oyun modu, haftalık tur, milletvekili seçimi, kural tabanlı rakip yapay zekâsı.
+Ek olarak: ayrıntılı karakter oluşturma (görünüm, meslek, memleket, kişilik), hizip bazlı zorlu kurultay (imza şartı, iki tur, canlı sayım), canlı TV yayını (cevaplar delege oyunu anlık değiştirir), arka planda 2023 seçim haritası.
 
 ## Nasıl oynanır
 - **Tek dosya:** `dist/sandik-ve-kursu.html` dosyasını telefona veya bilgisayara indirip tarayıcıda aç. İnternet gerekmez.

@@ -32,5 +32,10 @@ Başlangıç (Haziran 2023): yıllık enflasyon %38,2, işsizlik %9,6, dolar/TL 
 ## Partiler ve liderler (kaynaklı)
 Haziran 2023 genel başkanları, YSK aday listesindeki parti başkanlarıdır. CHP 38. Olağan Kurultayı tarihi (4–5 Kasım 2023) gerçek takvimdir; kurultay sonucu oyunda simüle edilir.
 
+## Kurultay (tahmini / tasarım)
+- Delege sayıları (CHP ≈1.370, AKP ≈1.450 vb.) ve adaylık için %20 delege imzası şartı **tahmini**; parti tüzükleriyle doğrulanmalı (`data/factions.js`).
+- Hizipler (genel merkez yönetimi, il ve ilçe başkanları, değişimciler, ideolojik çekirdek) genelleştirilmiş **tasarım** kategorileridir; gerçek kişi veya grupları temsil etmez.
+- Canlı yayın programları, kanallar ve sunucular kurgusaldır (`data/tv.js`).
+
 ## Tasarım varsayımları
 Parti ideoloji konumları, seçmen kümeleri ve bunların payları (2023 oylarından türetilir), medya erişimi, lider karizması, bütçe kalemleri ve tüm denge katsayıları (`engine/params.js`) oyun tasarımıdır. Gerçek kişi veya kurumlar hakkında iddia içermez. Olay havuzundaki tüm olaylar kurgusaldır.

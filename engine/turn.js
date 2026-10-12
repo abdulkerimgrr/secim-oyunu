@@ -10,6 +10,8 @@ import { addNews } from './news.js';
 import { clamp, addDays, daysBetween, fmtMoney, priceIndex } from './util.js';
 import { PROVINCE_BY_PLATE, playerParty, PLAYER_ID } from './state.js';
 import { allianceShare } from './model.js';
+import { weeklyPull, runKurultayVote } from './kurultay.js';
+import { charMod } from './character.js';
 
 export function withRng(state, fn) {
   const rng = createRng(state.seed);
@@ -76,20 +78,22 @@ function finances(state, f) {
 function kurultayResult(state, rng) {
   const k = state.player.kurultay;
   const party = playerParty(state);
-  const vote = clamp(k.support + rng.normal(0, 3.5), 1, 97);
-  const won = vote > 50;
-  const res = { type: 'kurultay', party: party.id, vote, won, oldLeader: party.leader.name };
-  if (won) {
+  const v = runKurultayVote(state, k, rng);
+  const res = { type: 'kurultay', party: party.id, ...v, oldLeader: party.leader.name, factions: k.factions.map(f => ({ ...f })) };
+  if (v.won) {
     state.player.isLeader = true;
-    party.leader = { name: state.player.name, charisma: 0.5, image: 0.55, image0: party.leader.image };
+    party.leader = { name: state.player.name, charisma: 0.5, image: 0.55 + charMod(state, 'image'), image0: party.leader.image, character: state.player.character };
     party.ideology0 = { ...party.ideology };
     party.momentum += 0.08;
-    party.unity = clamp(party.unity - (60 - Math.min(60, vote)) * 0.6, 20, 100);
+    // Verilen sözler ve yönetimin küskünlüğü iç huzuru zorlar
+    party.unity = clamp(party.unity - (60 - Math.min(60, v.vote)) * 0.6 - 3 * k.promises, 15, 100);
     party.money = Math.max(party.money, 50_000_000 * priceIndex(state));
-    addNews(state, 'player', `${party.short} kurultayında ${state.player.name} genel başkan seçildi (oyların %${vote.toFixed(1).replace('.', ',')})`);
+    const hc = state.player.character?.hometown;
+    if (hc) state.camp[hc] = { ...(state.camp[hc] || {}), [party.id]: 0.15 };
+    addNews(state, 'player', `${party.short} kurultayında ${state.player.name} genel başkan seçildi (oyların %${v.vote.toFixed(1).replace('.', ',')})`);
   } else {
     addNews(state, 'player', `${party.short} kurultayında ${res.oldLeader} yeniden genel başkan seçildi`);
-    state.gameOver = { reason: 'kurultay', title: 'Kurultayı kaybettin', text: `Kurultayda aldığın oy: %${vote.toFixed(1).replace('.', ',')}. ${party.short} genel başkanlığı şimdilik başka bahara kaldı.` };
+    state.gameOver = { reason: 'kurultay', title: 'Kurultayı kaybettin', text: `Son turda aldığın oy: %${v.vote.toFixed(1).replace('.', ',')}. ${party.short} genel başkanlığı şimdilik başka bahara kaldı.` };
   }
   return res;
 }
@@ -147,11 +151,7 @@ export function endTurn(state) {
     finances(state, f);
 
     // Kurultay öncesi: mevcut yönetimin karşı hamlesi
-    if (state.player.mode === 'join' && !state.player.isLeader) {
-      const k = state.player.kurultay;
-      const pull = { AKP: 1.0, MHP: 1.0 }[me.id] ?? 0.45;
-      k.support = clamp(k.support - (pull + rng.range(0, 0.5)) * f * (DIFFICULTY[state.difficulty]?.rival ?? 1), 0, 95);
-    }
+    if (state.player.mode === 'join' && !state.player.isLeader) weeklyPull(state, state.player.kurultay, me.id, rng, f);
 
     // Olaylar
     maybeTriggerEvent(state, rng, state.phase === 'campaign' ? 0.2 : 0.45);
@@ -162,8 +162,15 @@ export function endTurn(state) {
     state.turn++;
     state.stats.weeks += f;
 
-    if (state.player.mode === 'join' && !state.player.isLeader && state.date >= state.player.kurultay.date) {
-      out.results.push(kurultayResult(state, rng));
+    if (state.player.mode === 'join' && !state.player.isLeader) {
+      const k = state.player.kurultay;
+      if (state.date >= k.sigDeadline && !k.sigChecked) {
+        k.sigChecked = true;
+        if (k.signatures < k.sigNeed * 100) {
+          state.gameOver = { reason: 'imza', title: 'Aday olamadın', text: `Kurultayda aday olmak için delegelerin %${Math.round(k.sigNeed * 100)}'inin imzası gerekiyordu; %${k.signatures.toFixed(1).replace('.', ',')} imza toplayabildin.` };
+        } else addNews(state, 'player', `${me.short} genel başkanlık yarışında ${state.player.name} adaylık için gerekli imzaları teslim etti`);
+      }
+      if (!state.gameOver && state.date >= k.date) out.results.push(kurultayResult(state, rng));
     }
     if (state.localElection && state.date >= state.localElection) {
       const r = runLocalElection(state, rng);
@@ -194,7 +201,7 @@ export function endTurn(state) {
     // Anket (normalde haftalık, kampanyada 2 günde bir)
     if (state.phase !== 'campaign' || state.turn % 2 === 0) takePoll(state, rng);
 
-    state.player.ap = state.phase === 'campaign' ? 3 : state.player.apMax;
+    state.player.ap = state.phase === 'campaign' ? 3 + charMod(state, 'ap') : state.player.apMax;
     checkEnd(state);
     return out;
   });
@@ -241,5 +248,6 @@ export function allianceChance(state, targetId) {
   // Karşı taraf, oyuncunun getireceği oya ve ideolojik yakınlığa bakar; küçük ve tanınmayan partiye ilgi azdır
   let p = 0.1 - 1.0 * dist + (theirs < thr ? 0.2 : 0) + Math.min(0.5, mine * 6) + 0.1 * me.recognition - (theirs > 0.2 ? 0.2 : 0);
   if (state.government.includes(t.id) && !state.government.includes(me.id)) p -= 0.3;
+  p += charMod(state, 'alliance');
   return clamp(p, 0.02, 0.9);
 }

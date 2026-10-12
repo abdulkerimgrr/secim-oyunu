@@ -11,9 +11,12 @@ import { DIFFICULTY } from './params.js';
 import { deepClone, clamp, addDays } from './util.js';
 import { takePoll } from './polls.js';
 import { computeSeats } from './election.js';
+import { initKurultay, recalcSupport } from './kurultay.js';
+import { charMod } from './character.js';
+import { randomCharacter } from '../data/character.js';
 
 export const PLAYER_ID = 'OYUNCU';
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export const PROVINCE_BY_PLATE = Object.fromEntries(PROVINCES.map(p => [p.plate, p]));
 
@@ -119,13 +122,14 @@ export function newGame(opts) {
   state.elections.push({ date: '2023-05-14', type: 'genel', national: base.national, seats: seats.seats, real: true });
 
   // Oyuncu
+  const character = opts.character ? deepClone(opts.character) : randomCharacter(() => rng.next());
   if (opts.mode === 'found') {
     const pd = opts.party;
     const founders = (opts.founders || []).map(deepClone);
     const has = s => founders.some(f => f.skill === s);
     state.parties[PLAYER_ID] = {
       id: PLAYER_ID, name: pd.name, short: pd.short, color: pd.color, slogan: pd.slogan || '',
-      leader: { name: opts.playerName, charisma: 0.5, image: 0.5, image0: 0.5 },
+      leader: { name: opts.playerName, charisma: 0.5, image: 0.5, image0: 0.5, character },
       ideology: deepClone(pd.ideology), ideology0: null,
       media: 0.08, recognition: 0.01, govWeight: 0, alliance: null, resources: 0, aggregate: false,
       money: Math.round(5_000_000 * diff.money), members: 150, unity: 80, momentum: 0,
@@ -133,19 +137,26 @@ export function newGame(opts) {
       founded: state.date, congressDate: null, founders,
     };
     state.player = {
-      mode: 'found', partyId: PLAYER_ID, name: opts.playerName, isLeader: true,
+      mode: 'found', partyId: PLAYER_ID, name: opts.playerName, isLeader: true, character,
       apMax: 5 + (has('saha') ? 1 : 0), ap: 0,
     };
+    state.player.apMax += charMod(state, 'ap');
+    const lp = state.parties[PLAYER_ID].leader;
+    lp.image = lp.image0 = 0.5 + charMod(state, 'image');
+    state.camp[character.hometown] = { [PLAYER_ID]: 0.15 }; // memleket etkisi
     state.newPartyE = 0;
   } else {
     const party = state.parties[opts.joinPartyId];
-    const kDate = party.kurultay || addDays(state.date, 7 * 14);
-    const baseSupport = { AKP: 3, MHP: 4, CHP: 22, IYI: 14, YSP: 12, YRP: 10, ZP: 10, TIP: 14, BBP: 8, MP: 15 }[party.id] ?? 10;
+    const kDate = party.kurultay || addDays(state.date, 7 * 16);
+    const k = initKurultay(party.id, kDate, !!party.kurultay);
+    recalcSupport(k);
+    k.startSupport = k.support;
     state.player = {
-      mode: 'join', partyId: party.id, name: opts.playerName, isLeader: false,
-      apMax: 5, ap: 0, personalMoney: Math.round(1_500_000 * diff.money),
-      kurultay: { date: kDate, support: baseSupport, startSupport: baseSupport, official: !!party.kurultay },
+      mode: 'join', partyId: party.id, name: opts.playerName, isLeader: false, character,
+      apMax: 5, ap: 0, personalMoney: 0, kurultay: k,
     };
+    state.player.apMax += charMod(state, 'ap');
+    state.player.personalMoney = Math.round(1_500_000 * diff.money * charMod(state, 'money'));
     party.isPlayer = true;
   }
   state.player.ap = state.player.apMax;

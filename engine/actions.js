@@ -8,6 +8,12 @@ import { ideologyDistance } from './model.js';
 import { clamp, addDays, fmtMoney, pct, fmtInt, loc, priceIndex } from './util.js';
 import { PROVINCE_BY_PLATE, playerParty } from './state.js';
 import { addNews } from './news.js';
+import { charMod, isHometown } from './character.js';
+import { bumpAll, bumpFaction } from './kurultay.js';
+import { prepareBroadcast } from './broadcast.js';
+
+const DELEGATE_WEIGHTS = { teskilat: 1.5, yonetim: 0.25, degisimci: 0.8, cekirdek: 0.7 };
+const fmtSigned = v => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(1).replace('.', ',')}`;
 
 const TOTAL_REG = () => 60_700_000;
 
@@ -43,7 +49,8 @@ export function topicFit(state, plate, topic) {
   let w = 0;
   CLUSTERS.forEach((c, i) => { w += info.clusters[i] * (c.priorities[topic] || 0); });
   let fit = 0.5 + 2.2 * w; // ortalama öncelik ≈ 0.2 → 0.94
-  if (topic === 'ekonomi') fit *= 1 + 0.3 * skill(state, 'ekonomist');
+  if (topic === 'ekonomi') fit *= (1 + 0.3 * skill(state, 'ekonomist')) * charMod(state, 'economy');
+  if (topic === 'hizmet') fit *= charMod(state, 'service');
   return fit;
 }
 
@@ -62,7 +69,7 @@ function addCamp(state, plate, partyId, v) {
 function addRecognition(p, v) { p.recognition = clamp(p.recognition + v * (1 - p.recognition), 0, 1); }
 function gaffeChance(state, base) {
   const trained = state.flags.trainedUntil && state.flags.trainedUntil >= state.date ? 0.5 : 1;
-  return base * trained * (1 - 0.5 * skill(state, 'iletisimci'));
+  return base * trained * (1 - 0.5 * skill(state, 'iletisimci')) * charMod(state, 'gaffe');
 }
 
 const R = (a, b, d = 2) => `${a >= 0 ? '+' : ''}${a.toFixed(d).replace('.', ',')} … ${b >= 0 ? '+' : ''}${b.toFixed(d).replace('.', ',')}`;
@@ -84,56 +91,69 @@ function channelFriendliness(state, ch) {
 // ---------- Eylem tanımları ----------
 export const ACTIONS = [
   // --- Kurultay öncesi (katıl modu) ---
+  { id: 'signatures', cat: 'Kurultay', icon: '✍️', label: 'İmza topla', ap: 1, preKurultay: true,
+    desc: 'Aday olabilmek için delegelerin imzası gerekir. Son tarih kurultaydan iki hafta önce.',
+    cost: () => 40000, personal: true,
+    estimate(state) {
+      const k = state.player.kurultay;
+      const cap = k.support * 1.6 + 6;
+      const g = Math.max(0, Math.min(cap - k.signatures, 3.2 * (0.5 + k.support / 40) * diff(state).effect * charMod(state, 'delegates') * fatigue(state, 'signatures')));
+      return { signatures: [g * 0.6, g * 1.3], cap };
+    },
+    run(state, prm, rng) {
+      const k = state.player.kurultay, e = this.estimate(state);
+      const d = Math.min(rng.range(...e.signatures), Math.max(0, e.cap - k.signatures));
+      k.signatures = clamp(k.signatures + d, 0, 100);
+      bumpFatigue(state, 'signatures');
+      return { title: 'İmza kampanyası', lines: [`İmza veren delege oranı: %${k.signatures.toFixed(1).replace('.', ',')} (gereken %${Math.round(k.sigNeed * 100)})`,
+        d < e.signatures[0] ? 'Seni desteklemeyen delegeler imza vermiyor; önce desteğini artır.' : 'Delegeler imza listesine adını yazdı.'] };
+    } },
   { id: 'delegates', cat: 'Kurultay', icon: '🤝', label: 'Delegelerle görüş', ap: 1, preKurultay: true,
-    params: ['province'], desc: 'İl delegeleriyle birebir görüşme. Büyük illerin delegesi daha çok.',
+    params: ['province'], desc: 'İl delegeleriyle birebir görüşme. En çok il başkanlarını ve teşkilatı etkiler; büyük illerin delegesi daha çok.',
     cost: () => 60000, personal: true,
     estimate(state, { province }) {
       const info = provinceInfo(state, province);
+      const base = (0.6 + 13 * info.seats / 600) * diff(state).effect * fatigue(state, 'delegates', province)
+        * charMod(state, 'delegates') * (isHometown(state, province) ? 1.5 : 1);
       const k = state.player.kurultay;
-      const base = (0.35 + 9 * info.seats / 600) * diff(state).effect * fatigue(state, 'delegates', province) * (1 - k.support / 85);
-      return { support: [base * 0.6, base * 1.4] };
+      const w = DELEGATE_WEIGHTS;
+      const approx = k.factions.reduce((a, f) => a + f.weight * base * (w[f.id] ?? 1) * (1 - f.support / 92), 0);
+      return { support: [approx * 0.6, approx * 1.4], base };
     },
     run(state, prm, rng) {
       const e = this.estimate(state, prm);
-      const d = rng.range(...e.support);
-      state.player.kurultay.support = clamp(state.player.kurultay.support + d, 0, 95);
+      const k = state.player.kurultay;
+      const before = k.support;
+      bumpAll(k, e.base * rng.range(0.6, 1.4), DELEGATE_WEIGHTS);
       bumpFatigue(state, 'delegates', prm.province);
-      return { title: `${PROVINCE_BY_PLATE[prm.province].name} delegeleriyle görüştün`, lines: [`Delege desteği ${d >= 0 ? '+' : ''}${d.toFixed(1)} puan`] };
+      const name = PROVINCE_BY_PLATE[prm.province].name;
+      return { title: `${name} delegeleriyle görüştün`, lines: [`Toplam delege desteği ${fmtSigned(k.support - before)} puan`, isHometown(state, prm.province) ? 'Memleketinde hemşehrilerin seni bağrına bastı.' : 'En çok il ve ilçe başkanları etkilendi.'] };
     } },
-  { id: 'vision', cat: 'Kurultay', icon: '🎙️', label: 'Vizyon konuşması (TV)', ap: 1, preKurultay: true,
-    desc: 'Adaylık vizyonunu televizyonda anlat. Gaf riski var.', cost: () => 0, personal: true,
-    estimate(state) {
-      const k = state.player.kurultay;
-      const b = 1.2 * diff(state).effect * fatigue(state, 'vision') * (1 - k.support / 85);
-      return { support: [b * 0.3, b * 1.5], risk: gaffeChance(state, 0.1) };
-    },
+  { id: 'vision', cat: 'Kurultay', icon: '🎙️', label: 'Vizyon konuşması (canlı yayın)', ap: 1, preKurultay: true,
+    desc: 'Canlı yayında sunucunun üç sorusunu cevapla. Her cevap hiziplerin delege oyunu anlık değiştirir.', cost: () => 0, personal: true,
+    estimate() { return { live: true }; },
     run(state, prm, rng) {
-      const e = this.estimate(state);
       bumpFatigue(state, 'vision');
-      if (rng.chance(e.risk)) {
-        const d = rng.range(1, 3);
-        state.player.kurultay.support = clamp(state.player.kurultay.support - d, 0, 95);
-        state.stats.gaffes++;
-        return { title: 'Canlı yayında sürçme', bad: true, lines: [`Bir ifaden tartışma yarattı. Delege desteği −${d.toFixed(1)} puan`] };
-      }
-      const d = rng.range(...e.support);
-      state.player.kurultay.support = clamp(state.player.kurultay.support + d, 0, 95);
-      return { title: 'Vizyon konuşması ses getirdi', lines: [`Delege desteği +${d.toFixed(1)} puan`] };
+      return { interactive: 'broadcast', broadcast: prepareBroadcast(state, 'kurultay', 'tarafsiz', rng), title: 'Canlı yayın', lines: [] };
     } },
-  { id: 'faction', cat: 'Kurultay', icon: '♟️', label: 'Hizip liderleriyle pazarlık', ap: 2, preKurultay: true,
-    desc: 'Parti içi grupların desteğini yönetimde yer sözüyle al. Parti huzurunu bozar.', cost: () => 150000, personal: true,
-    estimate(state) {
-      const k = state.player.kurultay;
-      const b = 3 * diff(state).effect * fatigue(state, 'faction') * (1 - k.support / 85);
-      return { support: [b * 0.4, b * 1.3], unity: [-4, -1] };
+  { id: 'faction', cat: 'Kurultay', icon: '♟️', label: 'Hizip liderleriyle pazarlık', ap: 2, preKurultay: true, params: ['faction'],
+    desc: 'Bir hizbin desteğini yönetimde yer sözüyle al. Diğer hizipler kıskanır, verdiğin sözler genel başkan olunca iç huzuru zorlar.', cost: () => 150000, personal: true,
+    estimate(state, { faction = 'teskilat' }) {
+      const k = state.player.kurultay, f = k.factions.find(x => x.id === faction);
+      const b = 5 * diff(state).effect * fatigue(state, 'faction:' + faction) * charMod(state, 'faction') * (1 - (f?.support || 0) / 92);
+      return { factionGain: [b * 0.5, b * 1.3], weight: f?.weight || 0, unity: [-4, -1] };
     },
     run(state, prm, rng) {
-      const e = this.estimate(state);
-      const d = rng.range(...e.support), u = rng.range(...e.unity);
-      state.player.kurultay.support = clamp(state.player.kurultay.support + d, 0, 95);
+      const k = state.player.kurultay, e = this.estimate(state, prm);
+      const before = k.support;
+      bumpFaction(k, prm.faction, rng.range(...e.factionGain) / Math.max(0.05, 1 - (k.factions.find(x => x.id === prm.faction).support) / 92));
+      for (const f of k.factions) if (f.id !== prm.faction) bumpFaction(k, f.id, -rng.range(0.2, 0.8));
+      k.promises++;
+      const u = rng.range(...e.unity);
       playerParty(state).unity = clamp(playerParty(state).unity + u, 0, 100);
-      bumpFatigue(state, 'faction');
-      return { title: 'Hizip pazarlığı', lines: [`Delege desteği +${d.toFixed(1)} puan`, `Parti içi huzur ${u.toFixed(0)}`] };
+      bumpFatigue(state, 'faction:' + prm.faction);
+      const fl = k.factions.find(x => x.id === prm.faction).label;
+      return { title: `${fl} ile pazarlık`, lines: [`Toplam delege desteği ${fmtSigned(k.support - before)} puan`, 'Diğer hizipler bu pazarlıktan rahatsız oldu.', `Verilen söz sayısı: ${k.promises}`] };
     } },
 
   // --- Saha ---
@@ -145,9 +165,10 @@ export const ACTIONS = [
       const org = p.orgs[province] || 0;
       const quality = 0.6 + 0.5 * org + 0.3 * skill(state, 'saha');
       const fit = topicFit(state, province, topic);
-      const toneM = tone === 'sert' ? 1.2 : 1.0;
+      const toneM = tone === 'sert' ? 1.2 * charMod(state, 'sert') : 1.0;
       const f = fatigue(state, 'rally', province);
-      const camp = 0.12 * diff(state).effect * quality * fit * toneM * f;
+      const home = isHometown(state, province) ? 1.4 : 1;
+      const camp = 0.12 * diff(state).effect * quality * fit * toneM * f * charMod(state, 'rally') * home;
       const rec = (0.003 + 0.012 * Math.sqrt(info.popShare)) * (0.5 + p.media) * diff(state).effect * f;
       const crowd = info.registered * 0.004 * (0.15 + p.recognition) * (0.25 + org) * (1 + 0.3 * skill(state, 'saha'));
       return { camp: [camp * 0.6, camp * 1.3], recognition: [rec * 0.7, rec * 1.3], crowd, fit, risk: gaffeChance(state, tone === 'sert' ? 0.1 : 0.05), fatigue: f };
@@ -193,7 +214,7 @@ export const ACTIONS = [
     cost: () => 40000,
     estimate(state, { province }) {
       const f = fatigue(state, 'visit', province);
-      const camp = 0.05 * diff(state).effect * (1 + 0.3 * skill(state, 'saha')) * f;
+      const camp = 0.05 * diff(state).effect * (1 + 0.3 * skill(state, 'saha')) * f * charMod(state, 'visit') * (isHometown(state, province) ? 1.4 : 1);
       return { camp: [camp * 0.6, camp * 1.3], org: [0.005, 0.02], fatigue: f };
     },
     run(state, prm, rng) {
@@ -225,23 +246,12 @@ export const ACTIONS = [
     },
     run(state, prm, rng) {
       const p = playerParty(state), e = this.estimate(state, prm), ch = CHANNELS[prm.channel];
-      const lines = [];
       bumpFatigue(state, 'tv:' + prm.channel);
       state.stats.tv++;
-      if (rng.chance(e.risk)) {
-        const im = rng.range(0.02, 0.05);
-        p.leader.image = clamp(p.leader.image - im, 0, 1); p.momentum -= 0.04; state.stats.gaffes++;
-        addRecognition(p, e.recognition[0]);
-        addNews(state, 'player', `${p.short} liderinin canlı yayındaki cevabı sosyal medyada gündem oldu`);
-        return { title: `${ch.label}: zor sorular`, bad: true, lines: ['⚠️ Bir soruya verdiğin cevap tartışma yarattı.', `İmaj −${pct(im, 1)}`] };
-      }
-      const rec = rng.range(...e.recognition), mom = rng.range(...e.momentum);
-      addRecognition(p, rec); p.momentum += mom;
+      // Görünürlük kazancının yarısı yayına çıkmakla gelir, kalanı cevaplara bağlı
+      addRecognition(p, rng.range(...e.recognition) * 0.6);
       if (prm.channel === 'yerel' && prm.province) addCamp(state, prm.province, p.id, 0.05 * diff(state).effect);
-      lines.push(`Tanınırlık +${pct(rec, 2)}`, `Ulusal ivme +${mom.toFixed(3)}`);
-      lines.push(e.friendly > 0.6 ? 'Dost bir ortamdı; mesajın rahat geçti.' : 'Karşıt bir ortamdı; yeni kitlelere ulaştın.');
-      if (rec > e.recognition[1] * 0.9) addNews(state, 'player', `${p.short} lideri ${state.player.name} ile yapılan televizyon röportajı çok izlendi`);
-      return { title: `${ch.label} konuğu oldun`, lines };
+      return { interactive: 'broadcast', broadcast: prepareBroadcast(state, 'genel', prm.channel, rng), title: `${ch.label} konuğu oldun`, lines: [] };
     } },
   { id: 'social', cat: 'Medya', icon: '📱', label: 'Sosyal medya kampanyası', ap: 1,
     desc: 'Video ve hedefli reklam. Viral olma şansı var ama kontrol edilemez.', cost: () => 300000,
@@ -359,8 +369,8 @@ export const ACTIONS = [
     estimate(state) {
       const p = playerParty(state);
       const poll = state.polls.length ? (state.polls[state.polls.length - 1].shares[p.id] || 0) : 0;
-      const m = (150000 + 2_500_000 * p.recognition + 20_000_000 * poll) * (1 + 0.5 * skill(state, 'finansci')) * diff(state).money * fatigue(state, 'fundraise') * priceIndex(state);
-      return { money: [m * 0.5, m * 1.4], risk: 0.05 * (1 - 0.7 * skill(state, 'hukukcu')) };
+      const m = (150000 + 2_500_000 * p.recognition + 20_000_000 * poll) * (1 + 0.5 * skill(state, 'finansci')) * diff(state).money * fatigue(state, 'fundraise') * priceIndex(state) * charMod(state, 'fundraise');
+      return { money: [m * 0.5, m * 1.4], risk: 0.05 * (1 - 0.7 * skill(state, 'hukukcu')) * charMod(state, 'scandal') };
     },
     run(state, prm, rng) {
       const p = playerParty(state), e = this.estimate(state);
@@ -447,7 +457,10 @@ export function runAction(state, action, prm, rng) {
 export function describeEstimate(state, action, prm) {
   const e = action.estimate(state, prm);
   const out = [];
+  if (e.live) out.push(['Biçim', 'Canlı yayın, 3 soru'], ['Etki', 'Cevaplarına göre her hizipte anlık değişir']);
   if (e.support) out.push(['Delege desteği', R(e.support[0], e.support[1], 1) + ' puan']);
+  if (e.signatures) out.push(['İmza', `+${e.signatures[0].toFixed(1).replace('.', ',')} … +${e.signatures[1].toFixed(1).replace('.', ',')} puan`]);
+  if (e.factionGain) out.push(['Hizip desteği', `+${e.factionGain[0].toFixed(1).replace('.', ',')} … +${e.factionGain[1].toFixed(1).replace('.', ',')} (ağırlık %${Math.round(e.weight * 100)})`]);
   if (e.camp) out.push(['İl kampanya etkisi', R(e.camp[0], e.camp[1])]);
   if (e.recognition) out.push(['Tanınırlık', `+${pct(e.recognition[0], 2)} … +${pct(e.recognition[1], 2)}`]);
   if (e.momentum) out.push(['Ulusal ivme', R(e.momentum[0], e.momentum[1], 3)]);

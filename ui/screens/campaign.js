@@ -19,6 +19,7 @@ function defaults(action, prm) {
     if (k === 'tone') p.tone = 'uzlasmaci';
     if (k === 'channel') p.channel = 'tarafsiz';
     if (k === 'region') p.region = REGION_NAMES[0];
+    if (k === 'faction') p.faction = 'teskilat';
   }
   if (p.channel === 'yerel' && !p.province) p.province = 34;
   return p;
@@ -39,6 +40,7 @@ export function openAction(ctx, action, prm0 = {}) {
       <p class="small" style="margin:0">${esc(action.desc)}</p>
       ${needProv ? `<label class="f">İl<select class="in" id="p-prov">${PROV_SORTED.map(p => `<option value="${p.plate}" ${+prm.province === p.plate ? 'selected' : ''}>${esc(p.name)} · ${p.seats} mv${playerParty(s).orgs[p.plate] ? ' · teşkilat ✓' : ''}</option>`).join('')}</select></label>` : ''}
       ${params.includes('region') ? `<div class="f">Bölge<div class="chips">${REGION_NAMES.map(r => `<button class="chip ${prm.region === r ? 'on' : ''}" data-region="${r}">${r}</button>`).join('')}</div></div>` : ''}
+      ${params.includes('faction') ? `<div class="f">Hizip<div class="list">${s.player.kurultay.factions.map(f => `<button class="select-card ${prm.faction === f.id ? 'on' : ''}" data-faction="${f.id}" style="padding:10px;margin-top:6px"><div style="flex:1"><b>${esc(f.label)}</b> <span class="small muted">· ağırlık %${Math.round(f.weight * 100)}</span><div class="small muted">${esc(f.desc)} · desteğin %${Math.round(f.support)}</div></div></button>`).join('')}</div></div>` : ''}
       ${params.includes('channel') ? `<div class="f">Kanal<div class="chips">${Object.entries(CHANNELS).map(([k, c]) => `<button class="chip ${prm.channel === k ? 'on' : ''}" data-channel="${k}">${c.label}</button>`).join('')}</div></div>` : ''}
       ${params.includes('topic') ? `<div class="f">Konu<div class="chips">${TOPICS.map(t => `<button class="chip ${prm.topic === t.id ? 'on' : ''}" data-topic="${t.id}">${t.label}</button>`).join('')}</div></div>` : ''}
       ${params.includes('tone') ? `<div class="f">Ton<div class="chips">${TONES.map(([k, l]) => `<button class="chip ${prm.tone === k ? 'on' : ''}" data-tone="${k}">${l}</button>`).join('')}</div></div>` : ''}
@@ -47,14 +49,15 @@ export function openAction(ctx, action, prm0 = {}) {
       ${ok !== true ? `<p class="small" style="color:var(--bad);margin:0">${esc(ok)}</p>` : ''}
       <button class="btn red block" id="p-go" ${ok === true ? '' : 'disabled'}>Uygula</button>`;
     body.querySelector('#p-prov')?.addEventListener('change', e => { prm.province = +e.target.value; draw(); });
+    body.querySelectorAll('[data-faction]').forEach(b => b.onclick = () => { prm.faction = b.dataset.faction; draw(); });
     body.querySelectorAll('[data-region]').forEach(b => b.onclick = () => { prm.region = b.dataset.region; draw(); });
     body.querySelectorAll('[data-channel]').forEach(b => b.onclick = () => { prm.channel = b.dataset.channel; prm = defaults(action, prm); draw(); });
     body.querySelectorAll('[data-topic]').forEach(b => b.onclick = () => { prm.topic = b.dataset.topic; draw(); });
     body.querySelectorAll('[data-tone]').forEach(b => b.onclick = () => { prm.tone = b.dataset.tone; draw(); });
     body.querySelector('#p-go').onclick = () => {
-      const res = ctx.act(action, prm);
-      if (!res) return;
       sh.close();
+      const res = ctx.act(action, prm);
+      if (!res || res.interactive) return;
       showActionResult(ctx, action, res);
     };
   };

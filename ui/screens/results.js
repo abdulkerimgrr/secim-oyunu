@@ -6,6 +6,7 @@ import { PROVINCES } from '../../data/generated/provinces.js';
 import { playerParty } from '../../engine/state.js';
 import { pct, fmtDate, fmtMoney } from '../../engine/util.js';
 import { ctx } from '../app.js';
+import { avatarSvg } from '../avatar.js';
 
 function overlay(html) {
   const o = el(`<div class="night" role="dialog" aria-modal="true"><div class="inner">${html}</div></div>`);
@@ -44,14 +45,7 @@ function playerVerdict(s, r) {
 }
 
 export function showResult(s, r, done) {
-  if (r.type === 'kurultay') {
-    const o = overlay(`<span class="live">KURULTAY</span><h1>${r.won ? 'Genel başkansın!' : 'Kurultay kaybedildi'}</h1>
-      <div class="card"><div class="stat" style="background:none"><div class="v" style="font-size:44px">%${r.vote.toFixed(1).replace('.', ',')}</div><div class="l">Delege oyu</div></div>
-      <p>${r.won ? `${esc(playerParty(s).name)} artık senin. Parti eylemleri açıldı: teşkilat, miting, ittifak. Önceki liderin tabanının bir kısmı küskün; iç huzuru gözet.` : `${esc(r.oldLeader)} görevini sürdürüyor.`}</p></div>
-      <button class="btn-end" style="padding:14px" data-a="ok">Devam</button>`);
-    o.querySelector('[data-a=ok]').onclick = () => { o.remove(); ctx.render(); done(); };
-    return;
-  }
+  if (r.type === 'kurultay') { showKurultay(s, r, done); return; }
   if (r.type === 'yerel') {
     const o = overlay(`<span class="live">YEREL SEÇİM</span><h1>Belediye başkanlıkları</h1><div id="m"></div>
       <div class="card"><div class="small muted" style="margin-bottom:6px">İl/büyükşehir belediye başkanlıkları (basitleştirilmiş: ilçe ve meclisler Aşama 6'da)</div>
@@ -131,4 +125,49 @@ export function showGameOver(s) {
       <dt>Seçimler</dt><dd>${s.elections.filter(e => !e.real).length}</dd></dl></div>
     <button class="btn-end" style="padding:14px" data-a="menu">Ana menü</button>`);
   o.querySelector('[data-a=menu]').onclick = () => { o.remove(); ctx.quit(); };
+}
+
+// Kurultay günü: delegeler oy kullanır, sayım canlı ilerler; gerekirse ikinci tur
+function showKurultay(s, r, done) {
+  const me = playerParty(s);
+  const names = { player: s.player.name, incumbent: r.oldLeader, third: 'Üçüncü aday' };
+  const cols = { player: me.color, incumbent: '#8C96A8', third: '#C9A227' };
+  const o = overlay(`<div class="row" style="justify-content:space-between"><span class="live">● CANLI · ${esc(me.short)} KURULTAYI</span><span class="counter num" id="kc"></span></div>
+    <h1 id="kt">1. tur oylaması</h1>
+    <div class="row" style="flex-wrap:nowrap;gap:12px"><div class="portrait" style="border:2px solid var(--hi)">${avatarSvg(s.player.character, { size: 72, bg: '#22345E' })}</div>
+      <p style="margin:0;opacity:.85">${r.delegates.toLocaleString('tr-TR')} delege sandık başında. Salonda bayraklar ve sloganlar; sayım masası kuruldu.</p></div>
+    <div class="card" id="kbars"></div><div id="kfinal"></div>`);
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const draw = (round, t) => {
+    const ids = Object.keys(round).filter(k => k !== 'valid');
+    const counted = Math.round(round.valid * t);
+    o.querySelector('#kc').textContent = `Sayılan oy ${counted.toLocaleString('tr-TR')} / ${round.valid.toLocaleString('tr-TR')}`;
+    o.querySelector('#kbars').innerHTML = ids.sort((a, b) => round[b] - round[a]).map(id => {
+      const v = round[id] * t;
+      return `<div style="margin:6px 0"><div class="row" style="justify-content:space-between"><b style="color:${id === 'player' ? 'var(--accent)' : 'var(--ink)'}">${esc(names[id])}</b>
+        <span class="num" style="font-family:var(--f-display);font-weight:700;font-size:20px">${Math.round(round[id] * round.valid * t).toLocaleString('tr-TR')} <span class="small muted">(%${(100 * (t ? round[id] : 0)).toFixed(1).replace('.', ',')})</span></span></div>
+        <div class="kbar" style="height:16px"><div style="width:${100 * v}%;background:${cols[id]}"></div><i style="left:50%"></i></div></div>`;
+    }).join('');
+  };
+  const animate = (round, cb) => {
+    if (reduced) { draw(round, 1); return cb(); }
+    let t = 0;
+    const step = () => { t = Math.min(1, t + 0.035); draw(round, t); if (t < 1) setTimeout(step, 60); else cb(); };
+    step();
+  };
+  const final = () => {
+    const last = r.rounds[r.rounds.length - 1];
+    o.querySelector('#kt').textContent = r.won ? 'Genel başkansın!' : 'Kurultay kaybedildi';
+    o.querySelector('#kfinal').innerHTML = `<div class="card"><p style="margin:0">${r.won
+      ? `${esc(me.name)} artık senin. Parti eylemleri açıldı: teşkilat, miting, ittifak. Önceki yönetimin tabanı küskün; verdiğin ${s.player.kurultay.promises} söz iç huzuru zorlayacak.`
+      : `${esc(r.oldLeader)} görevini sürdürüyor. Son turda delegelerin %${(100 * last.player).toFixed(1).replace('.', ',')} oyunu aldın.`}</p></div>
+      <button class="btn-end" style="padding:14px;width:100%" data-a="ok">Devam</button>`;
+    o.querySelector('[data-a=ok]').onclick = () => { o.remove(); ctx.render(); done(); };
+  };
+  animate(r.rounds[0], () => {
+    if (r.rounds.length > 1) {
+      o.querySelector('#kt').textContent = 'Kimse yarıyı geçemedi: 2. tur!';
+      setTimeout(() => { o.querySelector('#kt').textContent = '2. tur oylaması'; animate(r.rounds[1], final); }, reduced ? 0 : 1400);
+    } else final();
+  });
 }

@@ -10,6 +10,8 @@ import { provinceInfo, actionById } from '../../engine/actions.js';
 import { eligibility } from '../../engine/turn.js';
 import { CLUSTERS } from '../../data/clusters.js';
 import { openAction } from './campaign.js';
+import { avatarSvg } from '../avatar.js';
+import { PROFESSIONS } from '../../data/character.js';
 
 const LAYERS = [
   ['first', 'Birinci parti'], ['me', 'Benim oyum'], ['alliance', 'İttifak'], ['turnout', 'Katılım'],
@@ -112,20 +114,36 @@ export function openProvince(s, ctx, plate) {
   sh.root.querySelectorAll('[data-act]').forEach(b => b.onclick = () => { sh.close(); openAction(ctx, actionById(b.dataset.act), { province: plate }); });
 }
 
+function portrait(s, size = 76) {
+  const me = playerParty(s);
+  return s.player.character ? `<div class="portrait">${avatarSvg(s.player.character, { size, bg: mixColor('#FFFFFF', me.color, 0.25) })}</div>` : partyBadge(me);
+}
+
 function statusCard(s) {
   const me = playerParty(s);
   const poll = s.polls[s.polls.length - 1].shares[me.id] || 0;
+  const c = s.player.character;
+  const who = c ? `${c.age} yaş · ${PROFESSIONS.find(p => p.id === c.profession)?.label || ''} · ${PROVINCE_BY_PLATE[c.hometown]?.name || ''}` : '';
   if (s.player.mode === 'join' && !s.player.isLeader) {
     const k = s.player.kurultay;
     const weeks = Math.max(0, Math.ceil(daysBetween(s.date, k.date) / 7));
-    const col = k.support >= 50 ? 'var(--good)' : k.support >= 40 ? 'var(--warn)' : 'var(--bad)';
-    return `<section class="card"><div class="row">${partyBadge(me)}<div class="grow" style="flex:1"><div class="eyebrow">Genel başkan adayı · ${esc(s.player.name)}</div><b>${esc(me.short)} kurultayına ${weeks} hafta</b></div></div>
-      <div style="margin-top:10px"><div class="row" style="justify-content:space-between"><span class="small"><b>Delege desteği</b></span><span class="num" style="font-family:var(--f-display);font-size:24px;font-weight:700;color:${col}">%${k.support.toFixed(1).replace('.', ',')}</span></div>
-      <div class="track" style="background:var(--muted);height:12px;border-radius:6px;position:relative;overflow:hidden"><div style="width:${k.support}%;height:100%;background:${col}"></div><div style="position:absolute;left:50%;top:0;bottom:0;border-left:2px solid var(--ink)"></div></div>
-      <div class="small muted" style="margin-top:6px">Kazanmak için %50'nin üzeri gerekir. Mevcut yönetim her hafta desteğini geri çekmeye çalışır. Kurultay: ${fmtDate(k.date)}${k.official ? '' : ' (oyun senaryosu)'}.</div></div></section>`;
+    const sigWeeks = Math.max(0, Math.ceil(daysBetween(s.date, k.sigDeadline) / 7));
+    const col = k.support >= 50 ? 'var(--good)' : k.support >= 38 ? 'var(--warn)' : 'var(--bad)';
+    const sigOk = k.signatures >= k.sigNeed * 100;
+    return `<section class="card kcard">
+      <div class="row" style="flex-wrap:nowrap;align-items:flex-start">${portrait(s)}
+        <div style="flex:1;min-width:0"><div class="eyebrow">${esc(me.short)} genel başkan adayı</div><div class="pname">${esc(s.player.name)}</div><div class="small muted">${esc(who)}</div>
+          <div class="kcount"><b class="num">${weeks}</b> hafta kaldı · kurultay ${fmtDate(k.date)}${k.official ? '' : ' <span class="muted">(senaryo)</span>'}</div></div></div>
+      <div class="row" style="justify-content:space-between;margin-top:10px"><span class="small"><b>Delege desteği</b> <span class="muted">· ${fmtInt(k.delegates)} delege</span></span><span class="num" style="font-family:var(--f-display);font-size:28px;font-weight:700;color:${col}">%${k.support.toFixed(1).replace('.', ',')}</span></div>
+      <div class="kbar"><div style="width:${k.support}%;background:${col}"></div><i style="left:50%"></i></div>
+      <div class="kfac">${k.factions.map(f => `<div class="kf"><div class="row" style="justify-content:space-between"><span class="small" style="font-weight:600">${esc(f.label)}</span><span class="small muted num">ağırlık %${Math.round(f.weight * 100)} · <b style="color:var(--ink)">%${Math.round(f.support)}</b></span></div><div class="kfbar"><div style="width:${f.support}%"></div></div></div>`).join('')}</div>
+      <div class="ksig ${sigOk ? 'ok' : ''}"><div class="row" style="justify-content:space-between"><span class="small"><b>Adaylık imzası</b> ${sigOk ? '✓' : `· son ${sigWeeks} hafta (${fmtDate(k.sigDeadline)})`}</span><span class="small num"><b>%${k.signatures.toFixed(1).replace('.', ',')}</b> / %${Math.round(k.sigNeed * 100)}</span></div>
+        <div class="kfbar"><div style="width:${Math.min(100, k.signatures / (k.sigNeed * 100) * 100)}%;background:${sigOk ? 'var(--good)' : 'var(--warn)'}"></div></div></div>
+      <p class="small muted" style="margin:8px 0 0">Kazanmak için ilk turda %50'nin üzeri gerekir; olmazsa ikinci tura kalınır. Genel merkez her hafta desteğini geri çekmeye çalışır.</p></section>`;
   }
   const el = s.player.mode === 'found' ? eligibility(s) : null;
-  return `<section class="card"><div class="row">${partyBadge(me)}<div style="flex:1;min-width:0"><div class="eyebrow">${esc(me.name)}</div><b>${esc(s.player.name)}</b>${me.slogan ? ` <span class="small muted">· “${esc(me.slogan)}”</span>` : ''}</div></div>
+  return `<section class="card"><div class="row" style="flex-wrap:nowrap;align-items:flex-start">${portrait(s, 64)}<div style="flex:1;min-width:0"><div class="row" style="gap:6px">${partyBadge(me)}<span class="eyebrow" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(me.name)}</span></div>
+      <div class="pname">${esc(s.player.name)}</div><div class="small muted">${me.slogan ? `“${esc(me.slogan)}” · ` : ''}${esc(who)}</div></div></div>
     <div class="grid3" style="margin-top:10px">
       <div class="stat"><div class="v" style="color:${poll >= s.rules.parliament.threshold ? 'var(--good)' : 'var(--ink)'}">${pct(poll)}</div><div class="l">Anket</div></div>
       <div class="stat"><div class="v">${pct(me.recognition, 0)}</div><div class="l">Tanınırlık</div></div>
