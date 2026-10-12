@@ -7,6 +7,7 @@ import { playerParty } from '../../engine/state.js';
 import { pct, fmtDate, fmtMoney } from '../../engine/util.js';
 import { ctx } from '../app.js';
 import { avatarSvg } from '../avatar.js';
+import { sfx } from '../sound.js';
 
 function overlay(html) {
   const o = el(`<div class="night" role="dialog" aria-modal="true"><div class="inner">${html}</div></div>`);
@@ -51,6 +52,7 @@ export function showResult(s, r, done) {
       <div class="card"><div class="small muted" style="margin-bottom:6px">İl/büyükşehir belediye başkanlıkları (basitleştirilmiş: ilçe ve meclisler Aşama 6'da)</div>
       <div class="list">${Object.entries(r.count).sort((a, b) => b[1] - a[1]).map(([id, n]) => `<div class="li"><i class="swatch" style="background:${s.parties[id].color}"></i><div class="grow t">${esc(s.parties[id].short)}</div><b class="num">${n} il</b></div>`).join('')}</div></div>
       <button class="btn-end" style="padding:14px" data-a="ok">Devam</button>`);
+    sfx('sting');
     const m = createMap();
     m.setInteractive(false);
     m.paint(pl => s.parties[r.mayors[pl]]?.color);
@@ -83,6 +85,9 @@ export function showResult(s, r, done) {
     return t;
   };
   const finish = () => {
+    if (o.dataset.fin) return; o.dataset.fin = '1';
+    const meId = playerParty(s).id;
+    sfx((r.seats[meId] || 0) > 0 || r.government.includes(meId) ? 'win' : 'lose');
     for (const p of PROVINCES) shown[p.plate] = true;
     m.paint(colorOf);
     o.querySelector('#cnt').textContent = 'Açılan sandık %100';
@@ -98,6 +103,7 @@ export function showResult(s, r, done) {
       <button class="btn-end" style="padding:14px;width:100%" data-a="ok">Yeni döneme başla</button>`;
     o.querySelector('[data-a=ok]').onclick = () => { o.remove(); ctx.render(); done(); };
   };
+  sfx('drumroll', 0, 2.2);
   if (reduced()) return finish();
   const step = () => {
     if (i >= order_.length) return finish();
@@ -117,6 +123,7 @@ export function showGameOver(s) {
   if (document.querySelector('.night')) return;
   const g = s.gameOver;
   const me = playerParty(s);
+  sfx('lose');
   const o = overlay(`<span class="live">OYUN SONU</span><h1>${esc(g.title)}</h1>
     <div class="card"><p style="margin-top:0">${esc(g.text)}</p><dl class="kv">
       <dt>Parti</dt><dd>${esc(me.name)}</dd><dt>Süre</dt><dd>${Math.round(s.stats.weeks)} hafta</dd><dt>Tarih</dt><dd>${fmtDate(s.date)}</dd>
@@ -158,12 +165,14 @@ function showKurultay(s, r, done) {
   const final = () => {
     const last = r.rounds[r.rounds.length - 1];
     o.querySelector('#kt').textContent = r.won ? 'Genel başkansın!' : 'Kurultay kaybedildi';
+    sfx(r.won ? 'win' : 'lose');
     o.querySelector('#kfinal').innerHTML = `<div class="card"><p style="margin:0">${r.won
       ? `${esc(me.name)} artık senin. Parti eylemleri açıldı: teşkilat, miting, ittifak. Önceki yönetimin tabanı küskün; verdiğin ${s.player.kurultay.promises} söz iç huzuru zorlayacak.`
       : `${esc(r.oldLeader)} görevini sürdürüyor. Son turda delegelerin %${(100 * last.player).toFixed(1).replace('.', ',')} oyunu aldın.`}</p></div>
       <button class="btn-end" style="padding:14px;width:100%" data-a="ok">Devam</button>`;
     o.querySelector('[data-a=ok]').onclick = () => { o.remove(); ctx.render(); done(); };
   };
+  sfx('drumroll', 0, 2.4);
   animate(r.rounds[0], () => {
     if (r.rounds.length > 1) {
       o.querySelector('#kt').textContent = 'Kimse yarıyı geçemedi: 2. tur!';

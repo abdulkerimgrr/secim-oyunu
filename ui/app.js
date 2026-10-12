@@ -1,6 +1,6 @@
 // Uygulama iskeleti: üst bar, son dakika şeridi, sekmeler, tur bitirme, kayıt.
 import { esc, el, toast, sheet } from './dom.js';
-import { fmtDate, fmtMoney, pct, daysBetween } from '../engine/util.js';
+import { fmtDate, fmtMoney, fmtMoneyShort, pct, daysBetween } from '../engine/util.js';
 import { endTurn, withRng } from '../engine/turn.js';
 import { runAction } from '../engine/actions.js';
 import { saveGame, loadGame } from '../engine/save.js';
@@ -16,9 +16,11 @@ import { renderSettings } from './screens/settings.js';
 import { renderNewGame } from './screens/newgame.js';
 import { showResult, showGameOver } from './screens/results.js';
 import { showBroadcast } from './screens/broadcast.js';
+import { showDebate } from './screens/debate.js';
 import { mountBackgroundMap } from './bgmap.js';
 import { avatarSvg } from './avatar.js';
 import { mixColor } from './map.js';
+import { sfx, soundToggleHtml, bindSoundToggle } from './sound.js';
 
 const ICONS = {
   harita: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Zm0 0v14m6-12v14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',
@@ -55,6 +57,7 @@ export const ctx = {
     saveGame(s, 'oto');
     render();
     if (res.interactive === 'broadcast') showBroadcast(ctx, res.broadcast);
+    if (res.interactive === 'debate') showDebate(ctx, res.debate);
     return res;
   },
   endTurn() {
@@ -115,6 +118,7 @@ function afterTurn(out) {
     else {
       const me = playerParty(s);
       const poll = s.polls[s.polls.length - 1].shares[me.id] || 0;
+      sfx(s.events.active.length ? 'sting' : 'ping');
       toast(s.player.mode === 'join' && !s.player.isLeader
         ? `Yeni tur · delege desteği %${s.player.kurultay.support.toFixed(1).replace('.', ',')}`
         : `Yeni tur · anket ${pct(poll)}${s.events.active.length ? ' · yeni gündem!' : ''}`);
@@ -131,8 +135,9 @@ function topbar(s) {
   const days = daysBetween(s.date, s.nextElection);
   const av = s.player.character ? `<div class="topav">${avatarSvg(s.player.character, { size: 36, bg: mixColor('#FFFFFF', me.color, 0.3) })}</div>` : '';
   return `<header class="topbar">${av}
-    <div class="tb-main"><div class="date num">${fmtDate(s.date)}</div><div class="sub">${s.phase === 'campaign' ? `Seçime ${days} gün` : `Seçime ${Math.ceil(days / 7)} hf`} · ${esc(fmtMoney(money))}</div></div>
+    <div class="tb-main"><div class="date num">${fmtDate(s.date)}</div><div class="sub">${s.phase === 'campaign' ? `Seçime ${days} gün` : `Seçime ${Math.ceil(days / 7)} hf`} · ${esc(fmtMoneyShort(money))}</div></div>
     <div title="Eylem puanı"><div class="ap">${pips}</div><div class="sub" style="text-align:right">${s.player.ap} puan</div></div>
+    ${soundToggleHtml()}
     <button class="btn-end" id="btn-end">${s.phase === 'campaign' ? 'Günü bitir' : 'Bitir ▸'}</button>
   </header>`;
 }
@@ -167,7 +172,8 @@ function render() {
   const view = el('<main class="view"></main>');
   app.appendChild(view);
   app.insertAdjacentHTML('beforeend', tabbar(s));
-  app.querySelector('#btn-end').onclick = () => ctx.endTurn();
+  app.querySelector('#btn-end').onclick = () => { sfx('whoosh'); ctx.endTurn(); };
+  bindSoundToggle(app);
   app.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => ctx.go(b.dataset.tab));
   const tab = TABS.find(t => t[0] === ctx.tab) || TABS[0];
   tab[2](view, ctx);

@@ -6,7 +6,9 @@ import { SKILLS } from '../../data/founders.js';
 import { RESULTS_2023 } from '../../data/generated/results2023.js';
 import { DIFFICULTY } from '../../engine/params.js';
 import { newGame, generateFounders } from '../../engine/state.js';
-import { loadGame, slotInfo, SLOTS } from '../../engine/save.js';
+import { loadGame, slotInfo, SLOTS, deleteSlot } from '../../engine/save.js';
+import { soundToggleHtml, bindSoundToggle, sfx } from '../sound.js';
+import { sheet } from '../dom.js';
 import { fmtDate, pct } from '../../engine/util.js';
 import { LOOKS, PROFESSIONS, EDUCATION, TRAITS, randomCharacter } from '../../data/character.js';
 import { PROVINCES } from '../../data/generated/provinces.js';
@@ -41,19 +43,7 @@ export function renderNewGame(view, ctx) {
   let html = '';
 
   if (w.step === 'splash') {
-    const auto = slotInfo('oto');
-    html = `<section class="splash"><div class="stripe" aria-hidden="true"></div>
-        <div class="eyebrow" style="color:var(--hi)">Siyasi simülasyon</div>
-        <h1>Sandık<br><em>ve</em> Kürsü</h1>
-        <p>Türkiye'de parti kur ya da bir partinin başına geç. 81 il, 600 sandalye, %7 baraj. Küçük başlamak neredeyse umutsuz; iktidar ise çok uzak.</p>
-        ${splashMap()}</section>
-      ${auto ? `<button class="btn primary block" data-a="continue">Devam et · ${esc(auto.party)} · ${fmtDate(auto.date)}</button>` : ''}
-      <button class="btn ${auto ? '' : 'primary'} block" data-a="new">Yeni oyun</button>
-      <div class="card"><h2>Kayıtlar</h2><div class="list">${SLOTS.filter(s => s !== 'oto').map(sl => {
-        const i = slotInfo(sl);
-        return `<div class="li"><div class="grow"><div class="t">Yuva ${sl}</div><div class="small muted">${i ? `${esc(i.party)} · ${esc(i.name)} · ${fmtDate(i.date)}` : 'Boş'}</div></div>${i ? `<button class="btn" data-load="${sl}">Yükle</button>` : ''}</div>`;
-      }).join('')}</div></div>
-      <p class="small muted">Bu sürüm erken bir prototiptir (Aşama 1). Gerçek parti ve kişiler olgusal, tarafsız bağlamda yer alır; oyundaki olaylar kurgusaldır.</p>`;
+    html = splashHtml();
   } else if (w.step === 'year') {
     html = `<h1 style="font-size:30px">Başlangıç yılı</h1><p class="muted">Seçtiğin yılın partileri, meclisi ve ekonomisi yüklenir.</p>
       <div class="grid2">${START_YEARS.map(y => `<button class="select-card ${w.year === y.id ? 'on' : ''}" data-year="${y.id}" ${y.available ? '' : 'disabled'}>
@@ -119,6 +109,9 @@ export function renderNewGame(view, ctx) {
   view.querySelector('[data-a=new]')?.addEventListener('click', () => { reset(); go('year'); });
   view.querySelector('[data-a=continue]')?.addEventListener('click', () => { const s = loadGame('oto'); if (s) ctx.start(s); else toast('Kayıt okunamadı.'); });
   view.querySelectorAll('[data-load]').forEach(b => b.onclick = () => { const s = loadGame(b.dataset.load); if (s) ctx.start(s); else toast('Kayıt okunamadı.'); });
+  view.querySelectorAll('[data-del]').forEach(b => b.onclick = () => confirmDelete(b.dataset.del, () => renderNewGame(view, ctx)));
+  view.querySelectorAll('[data-howto]').forEach(b => b.onclick = () => { w.howto = !w.howto; renderNewGame(view, ctx); });
+  bindSoundToggle(view);
   view.querySelectorAll('[data-year]').forEach(b => b.onclick = () => { w.year = b.dataset.year; renderNewGame(view, ctx); });
   view.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { w.mode = b.dataset.mode; renderNewGame(view, ctx); });
   view.querySelectorAll('[data-join]').forEach(b => b.onclick = () => { w.joinPartyId = b.dataset.join; renderNewGame(view, ctx); });
@@ -249,4 +242,73 @@ function splashMap() {
   for (const id of Object.values(w)) count[id] = (count[id] || 0) + 1;
   return `<div class="splashmap"><svg viewBox="${x} ${y} ${vw} ${vh}" role="img" aria-label="2023 seçim haritası">${PROVINCES.map(p => `<path d="${p.path}" fill="${col[w[p.plate]]}"/>`).join('')}</svg>
     <div class="legend" style="color:#fff">${Object.entries(count).sort((a, b) => b[1] - a[1]).map(([id, n]) => `<span><i class="swatch" style="background:${col[id]}"></i>${esc(PARTIES_2023.find(p => p.id === id).short)} ${n} il</span>`).join('')}<span style="opacity:.7">· 14 Mayıs 2023, illerde birinci parti</span></div></div>`;
+}
+
+const SLOT_NAME = sl => sl === 'oto' ? 'Otomatik kayıt' : `Yuva ${sl}`;
+
+function confirmDelete(slot, after) {
+  const i = slotInfo(slot);
+  const sh = sheet(`<h2>${SLOT_NAME(slot)} silinsin mi?</h2>
+    <p style="margin:0">${i ? `${esc(i.partyName || i.party)} · ${esc(i.name)} · ${fmtDate(i.date)}` : ''}</p>
+    <p class="small muted" style="margin:0">Bu işlem geri alınamaz.</p>
+    <div class="grid2"><button class="btn" data-a="no">Vazgeç</button><button class="btn red" data-a="yes">🗑 Sil</button></div>`);
+  sh.root.querySelector('[data-a=no]').onclick = sh.close;
+  sh.root.querySelector('[data-a=yes]').onclick = () => { deleteSlot(slot); sfx('whoosh'); sh.close(); toast('Kayıt silindi'); after(); };
+}
+
+function slotRow(sl) {
+  const i = slotInfo(sl);
+  const por = i?.character ? `<div class="slot-por">${avatarSvg(i.character, { size: 44, bg: mixColor('#FFFFFF', i.color, 0.3) })}</div>` : `<div class="slot-por empty">${sl === 'oto' ? '⟳' : sl}</div>`;
+  return `<div class="li slot">${por}
+    <div class="grow"><div class="t">${SLOT_NAME(sl)}</div>
+      <div class="small muted">${i ? `<span class="badge" style="background:${i.color};height:18px;min-width:0;font-size:12px">${esc(i.party)}</span> ${esc(i.name)} · ${fmtDate(i.date)}${i.gameOver ? ' · <b style="color:var(--bad)">oyun bitti</b>' : ''}` : 'Boş'}</div></div>
+    ${i ? `<button class="btn small-btn" data-load="${sl}">Yükle</button><button class="btn small-btn icon" data-del="${sl}" aria-label="${SLOT_NAME(sl)} kaydını sil" title="Sil">🗑</button>` : ''}</div>`;
+}
+
+function splashHtml() {
+  const auto = slotInfo('oto');
+  const tot = {};
+  for (const r of RESULTS_2023) for (const [k, v] of Object.entries(r.votes)) tot[k] = (tot[k] || 0) + v;
+  const T = Object.values(tot).reduce((a, b) => a + b, 0);
+  const facts = PARTIES_2023.filter(p => !p.aggregate).sort((a, b) => (tot[b.id] || 0) - (tot[a.id] || 0)).slice(0, 7)
+    .map(p => `<span><i class="swatch" style="background:${p.color}"></i>${esc(p.short)} ${pct(tot[p.id] / T)}</span>`).join('');
+  const cont = auto ? `<section class="card cont anim-in">
+      <div class="eyebrow">Kaldığın yerden devam et</div>
+      <div class="row" style="flex-wrap:nowrap;align-items:center;gap:12px;margin-top:6px">
+        ${auto.character ? `<div class="portrait">${avatarSvg(auto.character, { size: 70, bg: mixColor('#FFFFFF', auto.color, 0.28) })}</div>` : ''}
+        <div style="flex:1;min-width:0"><div class="row" style="gap:6px"><span class="badge" style="background:${auto.color}">${esc(auto.party)}</span><span class="small muted">${auto.mode === 'join' ? (auto.isLeader ? 'Genel başkan' : 'Genel başkan adayı') : 'Kurucu genel başkan'}</span></div>
+          <div class="pname">${esc(auto.name)}</div>
+          <div class="small muted">${fmtDate(auto.date)} · ${auto.support !== null && auto.support !== undefined ? `delege desteği %${auto.support.toFixed(1).replace('.', ',')}` : `anket ${pct(auto.poll)}`} · ${DIFFICULTY[auto.difficulty]?.label || ''}</div></div>
+      </div>
+      <div class="row" style="margin-top:10px;flex-wrap:nowrap"><button class="btn primary" style="flex:1" data-a="continue">▶ Devam et</button><button class="btn icon" data-del="oto" aria-label="Otomatik kaydı sil" title="Sil">🗑</button></div>
+    </section>` : '';
+  const features = [
+    ['🗺️', '81 il, 600 sandalye', 'Gerçek 2023 sonuçları, D\'Hondt ve %7 baraj'],
+    ['♟️', 'Kurultay ve hizipler', 'İmza topla, delegeleri ikna et, iki turlu oylama'],
+    ['📺', 'Canlı TV ve tartışma', 'Sunucu soruları, liderler tartışması, reyting'],
+    ['📱', 'Sosyal medya', 'TikTok, X, Instagram, YouTube, WhatsApp kampanyaları'],
+    ['📣', 'Miting ve saha', 'Meydan, konuşma metni, hava, rakip çakışması'],
+    ['🗳️', 'Seçim gecesi', 'İl il açılan sandıklar ve yeni meclis'],
+  ];
+  const steps = [
+    ['Karakterini oluştur', 'Görünüm, meslek, memleket ve kişilik seç.'],
+    ['Partini kur ya da kurultayı kazan', 'Yeni partiyle 41 ilde teşkilat kur veya gerçek bir partinin delegelerini ikna et.'],
+    ['Her hafta 5 eylem puanını kullan', 'Miting, TV, basın açıklaması, sosyal medya, teşkilat ve bağış.'],
+    ['Gündeme cevap ver, turu bitir', 'Olaylara tutum al; anketler, rakipler ve ekonomi her hafta değişir.'],
+    ['Seçim gecesi', '%7 barajı geç, sandalye kazan, iktidarı hedefle.'],
+  ];
+  return `<section class="splash"><div class="stripe" aria-hidden="true"></div>
+      <div class="row" style="justify-content:space-between;align-items:flex-start"><div class="eyebrow" style="color:var(--hi)">Siyasi simülasyon · Türkiye</div>${soundToggleHtml()}</div>
+      <h1>Sandık<br><em>ve</em> Kürsü</h1>
+      <p>Parti kur ya da bir partinin başına geç. 81 il, 600 sandalye, %7 baraj. Küçük başlamak neredeyse umutsuz; iktidar ise çok uzak.</p>
+      ${splashMap()}
+      <div class="splash-ticker"><b>14 MAYIS 2023</b><div class="st-track"><div class="st-run">${facts}${facts}</div></div></div>
+    </section>
+    ${cont}
+    <button class="btn ${auto ? '' : 'primary'} block newgame-btn anim-in" data-a="new"><b>＋ Yeni oyun</b><span>2023 başlangıcı · parti kur veya partiye katıl</span></button>
+    <section class="card anim-in"><h2>Kayıtlar <small>bu tarayıcıda saklanır</small></h2><div class="list">${SLOTS.map(slotRow).join('')}</div></section>
+    <section class="card anim-in"><h2>Neler var?</h2><div class="feat">${features.map(([i, t, d]) => `<div class="feat-i"><span>${i}</span><b>${t}</b><small>${d}</small></div>`).join('')}</div></section>
+    <section class="card anim-in"><button class="howto-h" data-howto aria-expanded="${!!w.howto}"><h2 style="margin:0">Nasıl oynanır?</h2><span>${w.howto ? '▲' : '▼'}</span></button>
+      ${w.howto ? `<ol class="howto">${steps.map(([t, d]) => `<li><b>${t}</b><span>${d}</span></li>`).join('')}</ol>` : ''}</section>
+    <p class="small muted" style="text-align:center">Gerçek parti ve kişiler olgusal, tarafsız bağlamda yer alır; olaylar, programlar ve medya kurgusaldır.<br>Sürüm: Aşama 1.7 · Veri: YSK 2023 sonuçları</p>`;
 }

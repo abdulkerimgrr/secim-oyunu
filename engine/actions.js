@@ -5,7 +5,7 @@ import { SKILLS } from '../data/founders.js';
 import { PROVINCES } from '../data/generated/provinces.js';
 import { DIFFICULTY } from './params.js';
 import { ideologyDistance } from './model.js';
-import { clamp, addDays, fmtMoney, pct, fmtInt, loc, priceIndex } from './util.js';
+import { clamp, addDays, fmtMoney, pct, fmtInt, loc, priceIndex, daysBetween } from './util.js';
 import { PROVINCE_BY_PLATE, playerParty } from './state.js';
 import { addNews } from './news.js';
 import { charMod, isHometown } from './character.js';
@@ -14,6 +14,9 @@ import { prepareBroadcast } from './broadcast.js';
 import { SOCIAL_CAMPAIGNS } from '../data/social.js';
 import { launchCampaign } from './social.js';
 import { pressStatement, stancesFor } from './press.js';
+import { VENUES, TRANSPORT, SPEECHES } from '../data/rally.js';
+import { weatherFor } from './weather.js';
+import { prepareDebate } from './debate.js';
 
 const DELEGATE_WEIGHTS = { teskilat: 1.5, yonetim: 0.25, degisimci: 0.8, cekirdek: 0.7 };
 const fmtSigned = v => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(1).replace('.', ',')}`;
@@ -160,57 +163,83 @@ export const ACTIONS = [
     } },
 
   // --- Saha ---
-  { id: 'rally', cat: 'Saha', icon: '📣', label: 'Miting', ap: 2, params: ['province', 'topic', 'tone'],
-    desc: 'Bir ilde meydan mitingi. Konu ilin önceliklerine uyarsa etki artar; boş meydan manşet olur.',
-    cost: (state, { province }) => Math.round(150000 + 1_600_000 * Math.sqrt(provinceInfo(state, province || 34).popShare)),
-    estimate(state, { province, topic = 'ekonomi', tone = 'uzlasmaci' }) {
+  { id: 'rally', cat: 'Saha', icon: '📣', label: 'Miting', ap: 2, params: ['province', 'venue', 'topic', 'speech', 'tone', 'transport'],
+    desc: 'İl, mekân, konuşma metni ve lojistiği seç. Hava durumu ve rakip mitingleri katılımı etkiler; dolmayan meydan manşet olur.',
+    cost: (state, { province, venue = 'meydan', transport = 'yok' } = {}) => {
+      const v = VENUES.find(x => x.id === venue) || VENUES[0], t = TRANSPORT.find(x => x.id === transport) || TRANSPORT[0];
+      return Math.round((150000 + 1_600_000 * Math.sqrt(provinceInfo(state, province || 34).popShare)) * v.cost * (1 + t.cost));
+    },
+    estimate(state, { province, venue = 'meydan', topic = 'ekonomi', speech, tone = 'uzlasmaci', transport = 'yok' }) {
       const p = playerParty(state), info = provinceInfo(state, province);
+      const v = VENUES.find(x => x.id === venue) || VENUES[0], t = TRANSPORT.find(x => x.id === transport) || TRANSPORT[0];
+      const sp = (SPEECHES[topic] || SPEECHES.ekonomi).find(x => x.id === speech) || (SPEECHES[topic] || SPEECHES.ekonomi)[0];
       const org = p.orgs[province] || 0;
       const quality = 0.6 + 0.5 * org + 0.3 * skill(state, 'saha');
-      const fit = topicFit(state, province, topic);
+      // konu + konuşma metninin ildeki seçmen kümelerine uyumu
+      let spFit = 0;
+      CLUSTERS.forEach((c, i) => { spFit += info.clusters[i] * (sp.audience[c.id] || 0); });
+      let consistency = 1;
+      for (const [ax, dir] of Object.entries(sp.axis || {})) consistency *= 1 + 0.35 * dir * (p.ideology[ax] || 0);
+      const fit = topicFit(state, province, topic) * (0.7 + 0.9 * spFit) * clamp(consistency, 0.6, 1.35);
       const toneM = tone === 'sert' ? 1.2 * charMod(state, 'sert') : 1.0;
       const f = fatigue(state, 'rally', province);
       const home = isHometown(state, province) ? 1.4 : 1;
-      const camp = 0.12 * diff(state).effect * quality * fit * toneM * f * charMod(state, 'rally') * home;
-      const rec = (0.003 + 0.012 * Math.sqrt(info.popShare)) * (0.5 + p.media) * diff(state).effect * f;
-      const crowd = info.registered * 0.004 * (0.15 + p.recognition) * (0.25 + org) * (1 + 0.3 * skill(state, 'saha'));
-      return { camp: [camp * 0.6, camp * 1.3], recognition: [rec * 0.7, rec * 1.3], crowd, fit, risk: gaffeChance(state, tone === 'sert' ? 0.1 : 0.05), fatigue: f };
+      const weather = weatherFor(state, province, info.region);
+      const clash = (state.flags.rivalRallies || []).filter(r => r.plate === +province && daysBetween(r.date, state.date) <= 7).map(r => state.parties[r.party]?.short).filter(Boolean);
+      const clashM = clash.length ? 0.78 : 1;
+      const wM = v.open ? weather.mult : 1;
+      const camp = 0.12 * diff(state).effect * quality * fit * toneM * f * charMod(state, 'rally') * home * v.effect * clashM;
+      const rec = (0.003 + 0.012 * Math.sqrt(info.popShare)) * (0.5 + p.media) * diff(state).effect * f * (v.id === 'salon' ? 0.6 : 1) * clashM;
+      const crowd = info.registered * 0.004 * (0.15 + p.recognition) * (0.25 + org) * (1 + 0.3 * skill(state, 'saha')) * t.crowd * wM * clashM;
+      const capacity = v.id === 'salon' ? clamp(info.registered * 0.0008, 1500, 9000) : Math.max(2500, info.registered * 0.004 * v.cap);
+      return { camp: [camp * 0.6, camp * 1.3], recognition: [rec * 0.7, rec * 1.3], crowd, capacity, fill: crowd / capacity, fit, weather: v.open ? weather : null, clash,
+        risk: gaffeChance(state, tone === 'sert' ? 0.1 : 0.05), transportRisk: t.risk, fatigue: f, speech: sp, venue: v };
     },
     run(state, prm, rng) {
       const p = playerParty(state), e = this.estimate(state, prm);
       const name = PROVINCE_BY_PLATE[prm.province].name;
-      const crowd = Math.round(e.crowd * rng.range(0.5, 1.5) / 100) * 100;
-      const luck = crowd / Math.max(1, e.crowd);
-      const org = p.orgs[prm.province] || 0;
+      const crowd = Math.round(Math.min(e.capacity * 1.15, e.crowd * rng.range(0.6, 1.4)) / 50) * 50;
+      const fill = crowd / e.capacity;
       const lines = [];
       let camp = rng.range(...e.camp), rec = rng.range(...e.recognition);
-      let title = `${name} mitingi`, bad = false;
-      if (luck < 0.65 && org < 0.15 && p.recognition < 0.6) {
-        camp *= 0.4; title = `${loc(name)} meydan boş kaldı`; bad = true;
-        p.momentum -= 0.02;
+      let title = `${name} mitingi`, bad = false, empty = false, packed = false;
+      if (fill < 0.3) {
+        empty = true; camp *= 0.45; bad = true; p.momentum -= 0.02;
+        title = e.venue.id === 'salon' ? `${loc(name)} salon yarı boş kaldı` : `${loc(name)} meydan boş kaldı`;
         addNews(state, 'player', `Manşet: "${p.short} mitinginde sandalyeler boş kaldı" (${name})`);
-      } else if (luck > 1.25 && crowd > 20000) {
-        p.momentum += 0.02;
-        addNews(state, 'player', `${p.short}, ${loc(name)} kalabalık bir miting düzenledi`);
-      } else addNews(state, 'player', `${p.short} lideri ${state.player.name}, ${loc(name)} konuştu`);
+      } else if (fill > 0.9) {
+        packed = true; camp *= 1.2; p.momentum += 0.02;
+        title = e.venue.id === 'salon' ? `${loc(name)} salon tıklım tıklım` : `${loc(name)} meydan doldu taştı`;
+        addNews(state, 'player', `${p.short}, ${loc(name)} ${e.venue.id === 'salon' ? 'salonu doldurdu' : 'meydanı doldurdu'}`);
+      } else addNews(state, 'player', `${p.short} lideri ${state.player.name}, ${loc(name)} konuştu: “${e.speech.text}”`);
       addCamp(state, prm.province, p.id, camp);
       addRecognition(p, rec);
-      lines.push(`Katılım: yaklaşık ${fmtInt(Math.max(crowd, 150))} kişi`);
+      lines.push(`${e.venue.label} · katılım yaklaşık ${fmtInt(Math.max(crowd, 100))} kişi (doluluk %${Math.round(Math.min(1.15, fill) * 100)})`);
       lines.push(`İl kampanya etkisi +${camp.toFixed(2).replace('.', ',')}`, `Tanınırlık +${pct(rec, 2)}`);
-      if (e.fit > 1.05) lines.push('Konu bu ilin önceliklerine uydu.');
-      else if (e.fit < 0.85) lines.push('Konu bu ilde pek karşılık bulmadı.');
+      if (e.weather && e.weather.mult < 1) lines.push(`${e.weather.icon} ${e.weather.label} hava katılımı düşürdü.`);
+      if (e.clash.length) lines.push(`Aynı hafta ${e.clash[0]} da bu ilde miting yaptı; ilgi bölündü.`);
+      if (e.fit > 1.1) lines.push('Konuşman bu ilin seçmenine çok iyi oturdu.');
+      else if (e.fit < 0.8) lines.push('Konuşman bu ilde pek karşılık bulmadı.');
+      let gaffe = false, transport = false;
+      if (rng.chance(e.transportRisk)) {
+        transport = true; bad = true; p.leader.image = clamp(p.leader.image - 0.02, 0, 1); p.momentum -= 0.02;
+        lines.push('⚠️ Mitinge otobüslerle taşıma yapıldığı haberlere yansıdı.');
+        addNews(state, 'player', `${p.short} mitingine ilçelerden otobüslerle taşıma yapıldığı iddia edildi`);
+      }
       if (rng.chance(e.risk)) {
+        gaffe = true;
         const im = rng.range(0.015, 0.04);
         p.leader.image = clamp(p.leader.image - im, 0, 1); p.momentum -= 0.03; state.stats.gaffes++;
         lines.push(`⚠️ Konuşmadaki bir ifade tartışma yarattı (imaj −${pct(im, 1)})`);
         addNews(state, 'player', `${p.short} liderinin ${name} konuşmasındaki sözler tartışma yarattı`);
         bad = true;
       }
-      if (e.fatigue < 0.75) lines.push('Bu ilde/eylemde seçmen yorgunluğu var; etki azaldı.');
+      if (e.fatigue < 0.75) lines.push('Bu ilde seçmen yorgunluğu var; etki azaldı.');
       bumpFatigue(state, 'rally', prm.province);
       state.stats.rallies++;
       state.flags.lastPlayerProvs = [prm.province, ...(state.flags.lastPlayerProvs || [])].slice(0, 6);
-      return { title, bad, lines , anim: { kind: 'rally', crowd: Math.max(crowd, 150), capacity: Math.max(2000, provinceInfo(state, prm.province).registered * 0.004), province: name, empty: title.includes('boş'), gaffe: lines.some(l => l.startsWith('⚠️ Konuşmadaki')), color: p.color, short: p.short, fit: e.fit } };
+      return { title, bad, lines, anim: { kind: 'rally', crowd: Math.max(crowd, 100), capacity: e.capacity, province: name, empty, packed, gaffe, transport,
+        color: p.color, short: p.short, fit: e.fit, venue: e.venue.id, weather: e.weather?.id || null, speech: e.speech.text } };
     } },
   { id: 'visit', cat: 'Saha', icon: '🏪', label: 'Esnaf, STK ve mahalle ziyareti', ap: 1, params: ['province'],
     desc: 'Düşük maliyetli yüz yüze temas. Yerel güven ve teşkilat moralini artırır.',
@@ -255,6 +284,17 @@ export const ACTIONS = [
       addRecognition(p, rng.range(...e.recognition) * 0.6);
       if (prm.channel === 'yerel' && prm.province) addCamp(state, prm.province, p.id, 0.05 * diff(state).effect);
       return { interactive: 'broadcast', broadcast: prepareBroadcast(state, 'genel', prm.channel, rng), title: `${ch.label} konuğu oldun`, lines: [] };
+    } },
+  { id: 'debate', cat: 'Medya', icon: '🎤', label: 'Liderler tartışması (canlı)', ap: 2, cost: () => 0,
+    desc: 'Seçim kampanyasında bir kez: en güçlü iki rakip parti lideriyle ortak canlı yayın. Kazanan anketlerde sıçrar.',
+    available(state) {
+      if (state.phase !== 'campaign') return 'Yalnızca seçim kampanyası döneminde (son 28 gün) yapılır.';
+      if (state.flags.debateDone === state.nextElection) return 'Bu seçim için tartışma yapıldı.';
+      return true;
+    },
+    estimate() { return { live: true, questions: 4 }; },
+    run(state, prm, rng) {
+      return { interactive: 'debate', debate: prepareDebate(state, rng), title: 'Liderler tartışması', lines: [] };
     } },
   { id: 'press', cat: 'Medya', icon: '🗞️', label: 'Basın açıklaması', ap: 1, params: ['topic', 'stance'],
     desc: 'Bir konuda tutum açıkla. Gazeteler, vatandaşlar, hükümet ve rakipler tepki verir. Tutumun hedef kitlesi farklıdır.', cost: () => 0,
@@ -475,7 +515,7 @@ export function describeEstimate(state, action, prm) {
   if (e.shield) out.push(['Kalkan', 'Rakip saldırıları −%50']);
   if (e.backfire) out.push(['Ters tepme riski', pct(e.backfire, 0)]);
   if (e.uturn) out.push(['Uyarı', 'Bu konuda farklı tutum almıştın (U dönüşü riski)']);
-  if (e.live) out.push(['Biçim', 'Canlı yayın, 3 soru'], ['Etki', 'Cevaplarına göre her hizipte anlık değişir']);
+  if (e.live) out.push(['Biçim', `Canlı yayın, ${e.questions || 3} soru`], ['Etki', e.questions ? 'Kazanan anketlerde sıçrar, kaybeden geriler' : 'Cevaplarına göre her hizipte anlık değişir']);
   if (e.support) out.push(['Delege desteği', R(e.support[0], e.support[1], 1) + ' puan']);
   if (e.signatures) out.push(['İmza', `+${e.signatures[0].toFixed(1).replace('.', ',')} … +${e.signatures[1].toFixed(1).replace('.', ',')} puan`]);
   if (e.factionGain) out.push(['Hizip desteği', `+${e.factionGain[0].toFixed(1).replace('.', ',')} … +${e.factionGain[1].toFixed(1).replace('.', ',')} (ağırlık %${Math.round(e.weight * 100)})`]);
@@ -487,7 +527,11 @@ export function describeEstimate(state, action, prm) {
   if (e.money) out.push(['Bağış', `${fmtMoney(e.money[0])} … ${fmtMoney(e.money[1])}`]);
   if (e.unity) out.push(['İç huzur', R(e.unity[0], e.unity[1], 0)]);
   if (e.weeks) out.push(['Süre', `${e.weeks} hafta`]);
-  if (e.crowd) out.push(['Beklenen katılım', `~${fmtInt(Math.max(150, e.crowd))} kişi`]);
+  if (e.crowd) out.push(['Beklenen katılım', `~${fmtInt(Math.max(100, e.crowd))} kişi${e.capacity ? ` / kapasite ${fmtInt(e.capacity)}` : ''}`]);
+  if (e.fill !== undefined) out.push(['Tahmini doluluk', e.fill < 0.3 ? `%${Math.round(e.fill * 100)} · boş kalma riski!` : e.fill > 0.9 ? `%${Math.round(Math.min(1.15, e.fill) * 100)} · dolup taşar` : `%${Math.round(e.fill * 100)}`]);
+  if (e.weather) out.push(['Hava', `${e.weather.icon} ${e.weather.label}${e.weather.mult < 1 ? ' (katılım düşer)' : ''}`]);
+  if (e.clash?.length) out.push(['Çakışma', `Son 7 günde burada ${e.clash.join(', ')} mitingi var (ilgi −%22)`]);
+  if (e.transportRisk) out.push(['Taşıma haberi riski', pct(e.transportRisk, 0)]);
   if (e.fit) out.push(['Konu uyumu', e.fit > 1.05 ? 'Yüksek' : e.fit < 0.85 ? 'Düşük' : 'Orta']);
   if (e.risk) out.push(['Gaf / risk', pct(e.risk, 0)]);
   if (e.viral) out.push(['Viral olma şansı', pct(e.viral, 0)]);

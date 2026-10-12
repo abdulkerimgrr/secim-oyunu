@@ -44,6 +44,9 @@ export function rivalsAct(state, rng, scale = 1) {
         });
         const c = state.camp[pv.plate] || (state.camp[pv.plate] = {});
         c[p.id] = (c[p.id] || 0) + rng.range(0.02, 0.06) * eff;
+        const rr = state.flags.rivalRallies || (state.flags.rivalRallies = []);
+        rr.unshift({ plate: pv.plate, party: p.id, date: state.date });
+        if (rr.length > 40) rr.length = 40;
         if (newsBudget > 0 && rng.chance(0.25)) { newsBudget--; addNews(state, 'rival', fill(rng.pick(NEWS_TEMPLATES.rally), { party: p.short, prov: pv.name, provLoc: loc(pv.name) })); }
       } else {
         p.momentum += rng.range(0.002, 0.008) * eff;

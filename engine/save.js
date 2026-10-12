@@ -34,7 +34,10 @@ export function slotInfo(slot) {
     const d = JSON.parse(raw);
     const s = d.state;
     const p = s.parties[s.player.partyId];
-    return { savedAt: d.savedAt, date: s.date, party: p.short, name: s.player.name, color: p.color };
+    const poll = s.polls?.length ? s.polls[s.polls.length - 1].shares[p.id] || 0 : 0;
+    return { savedAt: d.savedAt, date: s.date, party: p.short, partyName: p.name, name: s.player.name, color: p.color,
+      character: s.player.character || null, mode: s.player.mode, isLeader: s.player.isLeader, poll,
+      support: s.player.kurultay && !s.player.isLeader ? s.player.kurultay.support : null, difficulty: s.difficulty, gameOver: !!s.gameOver };
   } catch { return null; }
 }
 

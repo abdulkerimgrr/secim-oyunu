@@ -30,7 +30,7 @@ export function launchCampaign(state, def, prm, rng, fatigueMul = 1) {
   // İlk hafta etkisi hemen
   const res = campaignWeek(state, c, 1, rng);
   if (backfire) { p.leader.image = clamp(p.leader.image - 0.02, 0, 1); p.momentum -= 0.02; }
-  if (viral) { p.momentum += 0.03; addNews(state, 'player', `${p.short} kampanyası sosyal medyada viral oldu: ${def.label.toLocaleLowerCase('tr')}`); }
+  if (viral) { p.momentum += 0.03; addNews(state, 'player', `${p.short} kampanyası sosyal medyada viral oldu (${def.label})`); }
   if (def.shield) state.flags.shieldUntil = addDays(state.date, def.weeks * 7);
   if (def.momentum) p.momentum += def.momentum * mult;
   if (def.image && !backfire) p.leader.image = clamp(p.leader.image + def.image * mult, 0, 1);

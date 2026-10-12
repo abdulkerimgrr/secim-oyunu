@@ -9,6 +9,7 @@ import { CLUSTERS } from '../data/clusters.js';
 import { CITIZENS, CITIZEN_LINES } from '../data/press.js';
 import { fmtMoney, fmtInt, fmtDate } from '../engine/util.js';
 import { playerParty } from '../engine/state.js';
+import { sfx } from './sound.js';
 
 const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -48,17 +49,27 @@ function sceneRally(s, a) {
     html: `<svg viewBox="0 0 360 200" class="sc-svg" preserveAspectRatio="xMidYMax slice">
         <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1C2C55"/><stop offset="1" stop-color="#E9895B"/></linearGradient></defs>
         <rect width="360" height="200" fill="url(#sky)"/>
-        <path d="M0 110 L0 70 L20 70 L20 55 L45 55 L45 80 L70 80 L70 48 L82 40 L94 48 L94 85 L130 85 L130 62 L160 62 L160 90 L200 90 L200 58 L215 50 L230 58 L230 88 L270 88 L270 66 L300 66 L300 82 L330 82 L330 60 L360 60 L360 110 Z" fill="#14213D" opacity=".85"/>
+        ${a.venue === 'salon' ? '<rect width="360" height="200" fill="#121A33"/><path d="M0 0 L120 110 L0 110 Z M360 0 L240 110 L360 110 Z" fill="rgba(255,255,255,.05)"/><rect x="0" y="100" width="360" height="100" fill="#1B2647"/>' : ''}
+        <path ${a.venue === 'salon' ? 'opacity="0"' : ''} d="M0 110 L0 70 L20 70 L20 55 L45 55 L45 80 L70 80 L70 48 L82 40 L94 48 L94 85 L130 85 L130 62 L160 62 L160 90 L200 90 L200 58 L215 50 L230 58 L230 88 L270 88 L270 66 L300 66 L300 82 L330 82 L330 60 L360 60 L360 110 Z" fill="#14213D" opacity=".85"/>
         <rect x="110" y="88" width="140" height="26" fill="#0E1730"/><rect x="104" y="84" width="152" height="6" fill="${a.color}"/>
         <rect x="120" y="20" width="120" height="20" rx="3" fill="${a.color}"/><text x="180" y="34" text-anchor="middle" font-size="12" font-weight="700" fill="${textOn(a.color)}" font-family="Barlow Condensed, sans-serif">${esc(a.short)} · ${esc(a.province.toLocaleUpperCase('tr'))}</text>
         ${chairs}${heads}
       </svg>
       <div class="sc-speaker">${avatarSvg(s.player.character, { size: 56, bg: 'transparent' })}</div>
-      ${a.gaffe ? '<div class="sc-alert">⚠️</div>' : ''}${!a.empty && a.fit > 1.05 ? confetti(a.color) : ''}
+      ${a.gaffe ? '<div class="sc-alert">⚠️</div>' : ''}${(a.packed || (!a.empty && a.fit > 1.05)) ? confetti(a.color) : ''}
+      ${a.weather === 'yagmur' ? precip('rain') : a.weather === 'kar' ? precip('snow') : ''}
+      ${a.transport ? '<div class="sc-bus">🚌🚌🚌</div>' : ''}
+      ${a.speech ? `<div class="sc-speech">“${esc(a.speech)}”</div>` : ''}
       <div class="sc-counter"><span>Katılım</span><b id="cnt">0</b></div>`,
     start(stage) { countUp(stage.querySelector('#cnt'), a.crowd, { ms: 1800 }); },
     ms: 2400,
   };
+}
+
+function precip(kind) {
+  let h = `<div class="sc-precip ${kind}" aria-hidden="true">`;
+  for (let i = 0; i < 50; i++) h += `<i style="left:${rnd(0, 100)}%;animation-delay:${rnd(0, 1500) | 0}ms;animation-duration:${kind === 'rain' ? rnd(500, 800) | 0 : rnd(1800, 3000) | 0}ms"></i>`;
+  return h + '</div>';
 }
 
 function confetti(color) {
@@ -297,6 +308,29 @@ function mediaWall(s, a) {
   </section>`;
 }
 
+function playSound(a, res) {
+  switch (a?.kind) {
+    case 'rally':
+      if (a.empty) sfx('murmur'); else sfx(a.packed ? 'cheer' : 'applause', 0.2);
+      if (a.weather === 'yagmur') sfx('rain');
+      if (a.gaffe) sfx('boo', 1.3);
+      break;
+    case 'visit': [0.4, 0.7, 1.0, 1.3].forEach(t => sfx('pop', t)); break;
+    case 'social': sfx('notif', 0.3); if (a.viral) sfx('cheer', 1.1); else if (a.backfire) sfx('boo', 1.1); break;
+    case 'press': sfx('flashes', 0.1); break;
+    case 'org': sfx('whoosh'); for (let i = 0; i < Math.min(8, a.plates.length); i++) sfx('ding', 0.3 + i * 0.14); break;
+    case 'strengthen': case 'members': sfx('whoosh'); sfx('pop', 0.6); sfx('pop', 0.9); break;
+    case 'money': if (a.bad) { sfx('coins'); sfx('lose', 1.4); } else sfx('coins'); break;
+    case 'congress': sfx('cheer', 0.2); break;
+    case 'meeting': sfx('murmur'); sfx('gavel', 1.6); break;
+    case 'training': [0.3, 0.7, 1.1, 1.5].forEach(t => sfx('tick', t)); sfx('ding', 1.8); break;
+    case 'signatures': for (let i = 0; i < 6; i++) sfx('tick', i * 0.26); break;
+    case 'delegates': case 'faction': sfx(a.change >= 0 ? 'applause' : 'murmur', 0.4); break;
+    default: sfx('click');
+  }
+  if (res.bad && !['rally', 'money', 'social'].includes(a?.kind)) sfx('lose', 1);
+}
+
 export function playCinema(ctx, action, res, { onClose } = {}) {
   const s = ctx.state;
   const a = res.anim;
@@ -319,6 +353,7 @@ export function playCinema(ctx, action, res, { onClose } = {}) {
     o.querySelector('#cpanel').hidden = false;
     o.querySelector('#cpanel').scrollIntoView?.({ block: 'nearest' });
   };
+  playSound(a, res);
   if (reduced()) { stage.classList.add('instant'); sc.start?.(stage); finish(); }
   else { sc.start?.(stage); setTimeout(finish, sc.ms); }
   stage.addEventListener('click', () => { stage.classList.add('instant'); finish(); });

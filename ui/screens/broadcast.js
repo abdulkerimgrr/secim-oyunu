@@ -9,6 +9,7 @@ import { storeProjection } from '../../engine/polls.js';
 import { playerParty } from '../../engine/state.js';
 import { randomCharacter } from '../../data/character.js';
 import { CITIZENS, CITIZEN_LINES } from '../../data/press.js';
+import { sfx } from '../sound.js';
 
 const ANSWER_SECONDS = 30;
 function seeded(seed) { let s = seed % 2147483647 || 7; return () => (s = (s * 16807) % 2147483647) / 2147483647; }
@@ -115,6 +116,7 @@ export function showBroadcast(ctx, b) {
       timer = setInterval(() => {
         const k = 1 - (Date.now() - t0) / (ANSWER_SECONDS * 1000);
         if (bar) { bar.style.width = Math.max(0, k * 100) + '%'; bar.classList.toggle('low', k < 0.3); }
+        if (k < 0.3 && k > 0 && Math.round((Date.now() - t0) / 200) % 5 === 0) sfx('tick');
         if (k <= 0) { clearInterval(timer); timeout(q); }
       }, 200);
     };
@@ -140,9 +142,9 @@ export function showBroadcast(ctx, b) {
     saveGame(s, 'oto');
     setMood(r.mood);
     shot(r.mood === 'smile' ? 'wide' : 'guest');
-    if (r.mood === 'smile') { emojis(['👏', '👍', '🔥', '❤️']); chat('pos', 2); viewers = Math.round(viewers * 1.04); }
-    else if (r.mood === 'tense') { emojis(['😮', '👎', '🤔'], 8); chat('neg', 2); }
-    else chat('mix', 2);
+    if (r.mood === 'smile') { emojis(['👏', '👍', '🔥', '❤️']); chat('pos', 2); viewers = Math.round(viewers * 1.04); sfx('applause'); }
+    else if (r.mood === 'tense') { emojis(['😮', '👎', '🤔'], 8); chat('neg', 2); sfx('boo'); }
+    else { chat('mix', 2); sfx('murmur'); }
     if (pre) {
       $('#tv-mv').textContent = '%' + r.meter.toFixed(1).replace('.', ',');
       $('#tv-bar').style.width = r.meter + '%';
@@ -162,6 +164,7 @@ export function showBroadcast(ctx, b) {
 
   const summary = () => {
     shot('wide');
+    sfx('ding');
     $('#tv-lower-text').textContent = `${b.program} · yayın sonu`;
     const best = changes.indexOf(Math.max(...changes));
     const share = Math.max(2, Math.min(28, 6 + 18 * me.recognition + changes.reduce((x, y) => x + y, 0) * (pre ? 1.5 : 0.01) + Math.random() * 3));
@@ -180,6 +183,7 @@ export function showBroadcast(ctx, b) {
 
   // Jenerik, sonra ilk soru
   const intro = $('#tv-intro');
+  sfx('jingle');
   if (reducedMotion()) { intro.remove(); ask(); }
   else setTimeout(() => { intro.classList.add('out'); setTimeout(() => { intro.remove(); ask(); }, 450); }, 1500);
 }

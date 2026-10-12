@@ -11,6 +11,8 @@ import { stancesFor } from '../../engine/press.js';
 import { SOCIAL_CAMPAIGNS } from '../../data/social.js';
 import { CLUSTERS } from '../../data/clusters.js';
 import { fmtInt, fmtDate } from '../../engine/util.js';
+import { VENUES, TRANSPORT, SPEECHES } from '../../data/rally.js';
+import { sfx } from '../sound.js';
 
 const PROV_SORTED = [...PROVINCES].sort((a, b) => b.seats - a.seats || a.name.localeCompare(b.name, 'tr'));
 const TONES = [['uzlasmaci', 'Uzlaşmacı'], ['sert', 'Sert']];
@@ -26,6 +28,9 @@ function defaults(action, prm) {
     if (k === 'region') p.region = REGION_NAMES[0];
     if (k === 'faction') p.faction = 'teskilat';
     if (k === 'stance') p.stance = stancesFor(p.topic || 'ekonomi')[0]?.id;
+    if (k === 'venue') p.venue = 'meydan';
+    if (k === 'speech') p.speech = (SPEECHES[p.topic || 'ekonomi'] || SPEECHES.ekonomi)[0].id;
+    if (k === 'transport') p.transport = 'yok';
   }
   if (p.channel === 'yerel' && !p.province) p.province = 34;
   return p;
@@ -49,7 +54,10 @@ export function openAction(ctx, action, prm0 = {}) {
       ${params.includes('faction') ? `<div class="f">Hizip<div class="list">${s.player.kurultay.factions.map(f => `<button class="select-card ${prm.faction === f.id ? 'on' : ''}" data-faction="${f.id}" style="padding:10px;margin-top:6px"><div style="flex:1"><b>${esc(f.label)}</b> <span class="small muted">· ağırlık %${Math.round(f.weight * 100)}</span><div class="small muted">${esc(f.desc)} · desteğin %${Math.round(f.support)}</div></div></button>`).join('')}</div></div>` : ''}
       ${params.includes('channel') ? `<div class="f">Kanal<div class="chips">${Object.entries(CHANNELS).map(([k, c]) => `<button class="chip ${prm.channel === k ? 'on' : ''}" data-channel="${k}">${c.label}</button>`).join('')}</div></div>` : ''}
       ${params.includes('topic') ? `<div class="f">Konu<div class="chips">${TOPICS.map(t => `<button class="chip ${prm.topic === t.id ? 'on' : ''}" data-topic="${t.id}">${t.label}</button>`).join('')}</div></div>` : ''}
+      ${params.includes('venue') ? `<div class="f">Mekân<div class="grid3">${VENUES.map(v => `<button class="select-card ${prm.venue === v.id ? 'on' : ''}" data-venue="${v.id}" style="padding:8px;flex-direction:column;gap:2px"><span style="font-size:22px">${v.icon}</span><b class="small">${esc(v.label)}</b><span class="small muted" style="font-size:11px">${esc(v.desc)}</span></button>`).join('')}</div></div>` : ''}
       ${params.includes('stance') ? `<div class="f">Tutum<div class="list">${stancesFor(prm.topic).map(st => `<button class="select-card ${prm.stance === st.id ? 'on' : ''}" data-stance="${st.id}" style="padding:10px;margin-top:6px"><div style="flex:1"><b>${esc(st.label)}</b><div class="small muted" style="font-family:var(--f-news)">“${esc(st.quote)}”</div>${audChips(st.audience)}</div></button>`).join('')}</div></div>` : ''}
+      ${params.includes('speech') ? `<div class="f">Konuşma metni<div class="list">${(SPEECHES[prm.topic] || SPEECHES.ekonomi).map(sp => `<button class="select-card ${prm.speech === sp.id ? 'on' : ''}" data-speech="${sp.id}" style="padding:10px;margin-top:6px"><div style="flex:1"><b style="font-family:var(--f-news)">“${esc(sp.text)}”</b>${audChips(sp.audience)}</div></button>`).join('')}</div></div>` : ''}
+      ${params.includes('transport') ? `<div class="f">Lojistik / taşıma<div class="chips wrap">${TRANSPORT.map(t => `<button class="chip ${prm.transport === t.id ? 'on' : ''}" data-transport="${t.id}">${t.label}</button>`).join('')}</div></div>` : ''}
       ${params.includes('tone') ? `<div class="f">Ton<div class="chips">${TONES.map(([k, l]) => `<button class="chip ${prm.tone === k ? 'on' : ''}" data-tone="${k}">${l}</button>`).join('')}</div></div>` : ''}
       <div class="card" style="background:var(--bg);box-shadow:none"><div class="eyebrow" style="margin-bottom:6px">Beklenen etki <span style="text-transform:none;letter-spacing:0;font-weight:500">(gerçek sonuç şansa ve gizli etkenlere bağlı)</span></div>
         <dl class="kv"><dt>Eylem puanı</dt><dd>${action.ap}</dd><dt>Maliyet</dt><dd>${cost ? fmtMoney(cost) : 'Ücretsiz'}${action.personal ? ' (kişisel)' : ''}</dd>${est.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>
@@ -59,7 +67,10 @@ export function openAction(ctx, action, prm0 = {}) {
     body.querySelectorAll('[data-faction]').forEach(b => b.onclick = () => { prm.faction = b.dataset.faction; draw(); });
     body.querySelectorAll('[data-region]').forEach(b => b.onclick = () => { prm.region = b.dataset.region; draw(); });
     body.querySelectorAll('[data-channel]').forEach(b => b.onclick = () => { prm.channel = b.dataset.channel; prm = defaults(action, prm); draw(); });
-    body.querySelectorAll('[data-topic]').forEach(b => b.onclick = () => { prm.topic = b.dataset.topic; if (params.includes('stance')) prm.stance = stancesFor(prm.topic)[0].id; draw(); });
+    body.querySelectorAll('[data-topic]').forEach(b => b.onclick = () => { prm.topic = b.dataset.topic; if (params.includes('stance')) prm.stance = stancesFor(prm.topic)[0].id; if (params.includes('speech')) prm.speech = SPEECHES[prm.topic][0].id; draw(); });
+    body.querySelectorAll('[data-venue]').forEach(b => b.onclick = () => { prm.venue = b.dataset.venue; draw(); });
+    body.querySelectorAll('[data-speech]').forEach(b => b.onclick = () => { prm.speech = b.dataset.speech; draw(); });
+    body.querySelectorAll('[data-transport]').forEach(b => b.onclick = () => { prm.transport = b.dataset.transport; draw(); });
     body.querySelectorAll('[data-stance]').forEach(b => b.onclick = () => { prm.stance = b.dataset.stance; draw(); });
     body.querySelectorAll('[data-tone]').forEach(b => b.onclick = () => { prm.tone = b.dataset.tone; draw(); });
     body.querySelector('#p-go').onclick = () => {

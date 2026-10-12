@@ -9,7 +9,7 @@ export function renderSettings(view, ctx) {
   view.insertAdjacentHTML('beforeend', `<section class="card"><h2>Kayıtlar <small>bu tarayıcıda saklanır</small></h2>
     <p class="small muted" style="margin:0 0 6px">Oyun her eylem ve turdan sonra otomatik kaydedilir.</p>
     <div class="list">${SLOTS.map(sl => { const i = slotInfo(sl); return `<div class="li"><div class="grow"><div class="t">${sl === 'oto' ? 'Otomatik kayıt' : 'Yuva ' + sl}</div><div class="small muted">${i ? `${esc(i.party)} · ${esc(i.name)} · ${fmtDate(i.date)}` : 'Boş'}</div></div>
-      ${sl !== 'oto' ? `<button class="btn" data-save="${sl}">Kaydet</button>` : ''}${i ? `<button class="btn" data-load="${sl}">Yükle</button>` : ''}${i && sl !== 'oto' ? `<button class="btn" data-del="${sl}" aria-label="Sil">✕</button>` : ''}</div>`; }).join('')}</div></section>`);
+      ${sl !== 'oto' ? `<button class="btn" data-save="${sl}">Kaydet</button>` : ''}${i ? `<button class="btn" data-load="${sl}">Yükle</button>` : ''}${i ? `<button class="btn" data-del="${sl}" aria-label="Sil" title="Sil">🗑</button>` : ''}</div>`; }).join('')}</div></section>`);
   view.insertAdjacentHTML('beforeend', `<section class="card"><h2>Dışa / içe aktar</h2>
     <p class="small muted" style="margin:0 0 8px">Kaydı başka bir cihaza taşımak için metni kopyala, diğer cihazda yapıştır.</p>
     <div class="grid2"><button class="btn" id="exp">Dışa aktar</button><button class="btn" id="imp">İçe aktar</button></div></section>`);
@@ -27,7 +27,8 @@ export function renderSettings(view, ctx) {
   view.querySelectorAll('[data-save]').forEach(b => b.onclick = () => { toast(saveGame(s, b.dataset.save) ? 'Kaydedildi' : 'Kaydedilemedi (tarayıcı depolaması kapalı olabilir)'); ctx.render(); });
   view.querySelectorAll('[data-load]').forEach(b => b.onclick = () => { const st = loadGame(b.dataset.load); if (st) { ctx.start(st); toast('Kayıt yüklendi'); } else toast('Kayıt okunamadı'); });
   view.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
-    const sh = sheet(`<h2>Yuva ${b.dataset.del} silinsin mi?</h2><div class="grid2"><button class="btn" data-a="no">Vazgeç</button><button class="btn red" data-a="yes">Sil</button></div>`);
+    const nm = b.dataset.del === 'oto' ? 'Otomatik kayıt' : `Yuva ${b.dataset.del}`;
+    const sh = sheet(`<h2>${nm} silinsin mi?</h2><p class="small muted" style="margin:0">Bu işlem geri alınamaz.${b.dataset.del === 'oto' ? ' Oyuna devam edersen otomatik kayıt bir sonraki eylemde yeniden oluşur.' : ''}</p><div class="grid2"><button class="btn" data-a="no">Vazgeç</button><button class="btn red" data-a="yes">Sil</button></div>`);
     sh.root.querySelector('[data-a=no]').onclick = sh.close;
     sh.root.querySelector('[data-a=yes]').onclick = () => { deleteSlot(b.dataset.del); sh.close(); ctx.render(); };
   });

@@ -38,3 +38,13 @@ export function loc(name) {
   const hard = 'fstkçşhp'.includes(lower[lower.length - 1]);
   return `${name}'${hard ? 't' : 'd'}${front ? 'e' : 'a'}`;
 }
+
+// Kısa para biçimi (üst bar): ₺80 Mn, ₺1,2 Mr
+export function fmtMoneyShort(x) {
+  const s = x < 0 ? '−' : '';
+  x = Math.abs(x);
+  if (x >= 1e9) return `${s}₺${(x / 1e9).toFixed(1).replace('.', ',')} Mr`;
+  if (x >= 1e6) return `${s}₺${(x / 1e6).toFixed(x >= 1e7 ? 0 : 1).replace('.', ',')} Mn`;
+  if (x >= 1e3) return `${s}₺${Math.round(x / 1e3)} B`;
+  return `${s}₺${Math.round(x)}`;
+}
