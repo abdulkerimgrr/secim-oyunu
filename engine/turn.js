@@ -12,6 +12,7 @@ import { PROVINCE_BY_PLATE, playerParty, PLAYER_ID } from './state.js';
 import { allianceShare } from './model.js';
 import { weeklyPull, runKurultayVote } from './kurultay.js';
 import { charMod } from './character.js';
+import { socialTick } from './social.js';
 
 export function withRng(state, fn) {
   const rng = createRng(state.seed);
@@ -116,6 +117,7 @@ export function endTurn(state) {
     const days = state.phase === 'campaign' ? 1 : 7;
     const f = days / 7;
     rivalsAct(state, rng, f);
+    socialTick(state, rng, f);
     economyStep(state, rng, days);
 
     // Sönümler

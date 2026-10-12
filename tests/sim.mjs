@@ -39,7 +39,7 @@ while (!s.gameOver && i < 400) {
       const r = (i * 7 + guard) % 6;
       if (r === 0) { act = A('rally'); prm = { province: big[(i + guard) % 20], topic: 'ekonomi', tone: 'uzlasmaci' }; }
       else if (r === 1) { act = A('tv'); prm = { channel: ['tarafsiz', 'muhalif', 'iktidara_yakin'][i % 3] }; }
-      else if (r === 2) act = A('social');
+      else if (r === 2) act = A(['social:kisavideo','social:hedefli','social:etiket','press'][i % 4]);
       else if (r === 3) { act = A('strengthenOrg'); prm = { province: big[(i + guard) % 30] }; }
       else if (r === 4) act = A('members');
       else { act = A('visit'); prm = { province: big[(i * 3 + guard) % 40] }; }

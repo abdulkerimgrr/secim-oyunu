@@ -175,6 +175,7 @@ function render() {
 }
 
 export function boot() {
+  globalThis.__sandik = ctx; // hata ayıklama ve otomatik testler için
   mountBackgroundMap();
   const saved = loadGame('oto');
   ctx.saved = !!saved;

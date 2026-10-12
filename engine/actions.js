@@ -11,6 +11,9 @@ import { addNews } from './news.js';
 import { charMod, isHometown } from './character.js';
 import { bumpAll, bumpFaction } from './kurultay.js';
 import { prepareBroadcast } from './broadcast.js';
+import { SOCIAL_CAMPAIGNS } from '../data/social.js';
+import { launchCampaign } from './social.js';
+import { pressStatement, stancesFor } from './press.js';
 
 const DELEGATE_WEIGHTS = { teskilat: 1.5, yonetim: 0.25, degisimci: 0.8, cekirdek: 0.7 };
 const fmtSigned = v => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(1).replace('.', ',')}`;
@@ -106,7 +109,7 @@ export const ACTIONS = [
       k.signatures = clamp(k.signatures + d, 0, 100);
       bumpFatigue(state, 'signatures');
       return { title: 'İmza kampanyası', lines: [`İmza veren delege oranı: %${k.signatures.toFixed(1).replace('.', ',')} (gereken %${Math.round(k.sigNeed * 100)})`,
-        d < e.signatures[0] ? 'Seni desteklemeyen delegeler imza vermiyor; önce desteğini artır.' : 'Delegeler imza listesine adını yazdı.'] };
+        d < e.signatures[0] ? 'Seni desteklemeyen delegeler imza vermiyor; önce desteğini artır.' : 'Delegeler imza listesine adını yazdı.'] , anim: { kind: 'signatures', value: k.signatures, need: k.sigNeed * 100 } };
     } },
   { id: 'delegates', cat: 'Kurultay', icon: '🤝', label: 'Delegelerle görüş', ap: 1, preKurultay: true,
     params: ['province'], desc: 'İl delegeleriyle birebir görüşme. En çok il başkanlarını ve teşkilatı etkiler; büyük illerin delegesi daha çok.',
@@ -127,7 +130,7 @@ export const ACTIONS = [
       bumpAll(k, e.base * rng.range(0.6, 1.4), DELEGATE_WEIGHTS);
       bumpFatigue(state, 'delegates', prm.province);
       const name = PROVINCE_BY_PLATE[prm.province].name;
-      return { title: `${name} delegeleriyle görüştün`, lines: [`Toplam delege desteği ${fmtSigned(k.support - before)} puan`, isHometown(state, prm.province) ? 'Memleketinde hemşehrilerin seni bağrına bastı.' : 'En çok il ve ilçe başkanları etkilendi.'] };
+      return { title: `${name} delegeleriyle görüştün`, lines: [`Toplam delege desteği ${fmtSigned(k.support - before)} puan`, isHometown(state, prm.province) ? 'Memleketinde hemşehrilerin seni bağrına bastı.' : 'En çok il ve ilçe başkanları etkilendi.'] , anim: { kind: 'delegates', change: k.support - before, support: k.support, province: name, color: playerParty(state).color } };
     } },
   { id: 'vision', cat: 'Kurultay', icon: '🎙️', label: 'Vizyon konuşması (canlı yayın)', ap: 1, preKurultay: true,
     desc: 'Canlı yayında sunucunun üç sorusunu cevapla. Her cevap hiziplerin delege oyunu anlık değiştirir.', cost: () => 0, personal: true,
@@ -153,7 +156,7 @@ export const ACTIONS = [
       playerParty(state).unity = clamp(playerParty(state).unity + u, 0, 100);
       bumpFatigue(state, 'faction:' + prm.faction);
       const fl = k.factions.find(x => x.id === prm.faction).label;
-      return { title: `${fl} ile pazarlık`, lines: [`Toplam delege desteği ${fmtSigned(k.support - before)} puan`, 'Diğer hizipler bu pazarlıktan rahatsız oldu.', `Verilen söz sayısı: ${k.promises}`] };
+      return { title: `${fl} ile pazarlık`, lines: [`Toplam delege desteği ${fmtSigned(k.support - before)} puan`, 'Diğer hizipler bu pazarlıktan rahatsız oldu.', `Verilen söz sayısı: ${k.promises}`] , anim: { kind: 'faction', faction: fl, change: k.support - before, support: k.support, color: playerParty(state).color } };
     } },
 
   // --- Saha ---
@@ -193,7 +196,7 @@ export const ACTIONS = [
       addCamp(state, prm.province, p.id, camp);
       addRecognition(p, rec);
       lines.push(`Katılım: yaklaşık ${fmtInt(Math.max(crowd, 150))} kişi`);
-      lines.push(`İl kampanya etkisi +${camp.toFixed(2)}`, `Tanınırlık +${pct(rec, 2)}`);
+      lines.push(`İl kampanya etkisi +${camp.toFixed(2).replace('.', ',')}`, `Tanınırlık +${pct(rec, 2)}`);
       if (e.fit > 1.05) lines.push('Konu bu ilin önceliklerine uydu.');
       else if (e.fit < 0.85) lines.push('Konu bu ilde pek karşılık bulmadı.');
       if (rng.chance(e.risk)) {
@@ -207,7 +210,7 @@ export const ACTIONS = [
       bumpFatigue(state, 'rally', prm.province);
       state.stats.rallies++;
       state.flags.lastPlayerProvs = [prm.province, ...(state.flags.lastPlayerProvs || [])].slice(0, 6);
-      return { title, bad, lines };
+      return { title, bad, lines , anim: { kind: 'rally', crowd: Math.max(crowd, 150), capacity: Math.max(2000, provinceInfo(state, prm.province).registered * 0.004), province: name, empty: title.includes('boş'), gaffe: lines.some(l => l.startsWith('⚠️ Konuşmadaki')), color: p.color, short: p.short, fit: e.fit } };
     } },
   { id: 'visit', cat: 'Saha', icon: '🏪', label: 'Esnaf, STK ve mahalle ziyareti', ap: 1, params: ['province'],
     desc: 'Düşük maliyetli yüz yüze temas. Yerel güven ve teşkilat moralini artırır.',
@@ -224,7 +227,7 @@ export const ACTIONS = [
       if (p.orgs[prm.province]) p.orgs[prm.province] = clamp(p.orgs[prm.province] + rng.range(...e.org), 0, 1);
       addRecognition(p, 0.001);
       bumpFatigue(state, 'visit', prm.province);
-      return { title: `${PROVINCE_BY_PLATE[prm.province].name} ziyareti`, lines: [`İl kampanya etkisi +${camp.toFixed(2)}`, p.orgs[prm.province] ? 'Teşkilat morali yükseldi.' : 'Bu ilde teşkilatın yok; kalıcı etki sınırlı.'] };
+      return { title: `${PROVINCE_BY_PLATE[prm.province].name} ziyareti`, lines: [`İl kampanya etkisi +${camp.toFixed(2).replace('.', ',')}`, p.orgs[prm.province] ? 'Teşkilat morali yükseldi.' : 'Bu ilde teşkilatın yok; kalıcı etki sınırlı.'] , anim: { kind: 'visit', province: PROVINCE_BY_PLATE[prm.province].name, color: p.color } };
     } },
 
   // --- Medya ---
@@ -253,47 +256,57 @@ export const ACTIONS = [
       if (prm.channel === 'yerel' && prm.province) addCamp(state, prm.province, p.id, 0.05 * diff(state).effect);
       return { interactive: 'broadcast', broadcast: prepareBroadcast(state, 'genel', prm.channel, rng), title: `${ch.label} konuğu oldun`, lines: [] };
     } },
-  { id: 'social', cat: 'Medya', icon: '📱', label: 'Sosyal medya kampanyası', ap: 1,
-    desc: 'Video ve hedefli reklam. Viral olma şansı var ama kontrol edilemez.', cost: () => 300000,
-    estimate(state) {
-      const p = playerParty(state), d = skill(state, 'dijital');
-      const f = fatigue(state, 'social');
-      const rec = 0.006 * (1 + d) * diff(state).effect * f;
-      return { recognition: [rec * 0.5, rec * 1.5], viral: 0.06 + 0.12 * d, backfire: 0.03 };
-    },
-    run(state, prm, rng) {
-      const p = playerParty(state), e = this.estimate(state);
-      bumpFatigue(state, 'social');
-      let rec = rng.range(...e.recognition);
-      const lines = [];
-      let title = 'Dijital kampanya yayında', bad = false;
-      if (rng.chance(e.viral)) {
-        rec += 0.03; p.momentum += 0.05; title = '🔥 Videon viral oldu!';
-        addNews(state, 'player', `${p.short} kampanya videosu sosyal medyada milyonlarca kez izlendi`);
-      } else if (rng.chance(e.backfire)) {
-        p.leader.image = clamp(p.leader.image - 0.02, 0, 1); title = 'Video ters tepti'; bad = true;
-        lines.push('Videodaki bir sahne alay konusu oldu.');
-      }
-      addRecognition(p, rec);
-      lines.push(`Tanınırlık +${pct(rec, 2)}`);
-      return { title, bad, lines };
-    } },
-  { id: 'press', cat: 'Medya', icon: '🗞️', label: 'Basın açıklaması', ap: 1, params: ['topic'],
-    desc: 'Gündemdeki bir konuda tutum açıkla. Ücretsiz ama etkisi medya erişimine bağlı.', cost: () => 0,
-    estimate(state, { topic = 'ekonomi' }) {
+  { id: 'press', cat: 'Medya', icon: '🗞️', label: 'Basın açıklaması', ap: 1, params: ['topic', 'stance'],
+    desc: 'Bir konuda tutum açıkla. Gazeteler, vatandaşlar, hükümet ve rakipler tepki verir. Tutumun hedef kitlesi farklıdır.', cost: () => 0,
+    estimate(state, { topic = 'ekonomi', stance }) {
       const p = playerParty(state), f = fatigue(state, 'press');
-      let mom = 0.012 * (0.3 + p.media + p.recognition) * diff(state).effect * f;
-      if (topic === 'ekonomi' && state.economy.inflation > 40) mom *= 1.4;
-      return { momentum: [mom * 0.3, mom * 1.3], recognition: [0.001, 0.004] };
+      const st = stancesFor(topic).find(x => x.id === stance) || stancesFor(topic)[0];
+      const reach = 0.3 + p.media + p.recognition;
+      const pw = 0.03 * reach * diff(state).effect * f;
+      const prev = state.flags.pressStances?.[topic];
+      return { cluster: [pw * 0.4, pw * 1.3], audience: st.audience, recognition: [0.002, 0.006], uturn: prev && prev !== st.id, risk: st.tone === 'sert' ? gaffeChance(state, 0.08) : 0 };
     },
     run(state, prm, rng) {
-      const p = playerParty(state), e = this.estimate(state, prm);
+      prm = { topic: 'ekonomi', ...prm };
+      const f = fatigue(state, 'press');
       bumpFatigue(state, 'press');
-      const mom = rng.range(...e.momentum), rec = rng.range(...e.recognition);
-      p.momentum += mom; addRecognition(p, rec);
-      const t = TOPICS.find(t => t.id === prm.topic);
-      return { title: `Basın açıklaması: ${t.label}`, lines: [`Ulusal ivme +${mom.toFixed(3)}`, `Tanınırlık +${pct(rec, 2)}`] };
+      const r = pressStatement(state, prm.topic, prm.stance, rng, f);
+      const lines = [`Hedef kitlede ivme +${r.power.toFixed(3).replace('.', ',')}`];
+      if (r.uturn) lines.push('⚠️ Bu konuda daha önce farklı bir tutum almıştın: "U dönüşü" yorumları yapıldı.');
+      if (r.gaffe) lines.push('⚠️ Sert bir ifaden tepki çekti.');
+      if (r.score > 0.3) addNews(state, 'player', `${playerParty(state).short} açıklaması gündemde: “${r.stance.quote}”`);
+      return { title: `Basın açıklaması: ${TOPICS.find(t => t.id === prm.topic).label}`, bad: r.uturn || r.gaffe, lines,
+        anim: { kind: 'press', quote: r.stance.quote, stance: r.stance.label, reactions: r.reactions, score: r.score } };
     } },
+
+  // --- Sosyal medya: her kampanya ayrı eylem ---
+  ...SOCIAL_CAMPAIGNS.map(def => ({
+    id: 'social:' + def.id, cat: 'Sosyal medya', icon: def.icon, label: def.label, ap: def.ap, params: def.params,
+    desc: def.desc, social: def, cost: () => def.cost,
+    available(state) {
+      const run = (state.socialCampaigns || []).find(c => c.id === def.id);
+      return run ? `Bu kampanya zaten sürüyor (${Math.ceil(run.weeksLeft)} hafta kaldı).` : true;
+    },
+    estimate(state) {
+      const p = playerParty(state), f = fatigue(state, 'social');
+      const dig = skill(state, 'dijital');
+      return { audience: def.audience, weeks: def.weeks, cluster: def.power ? [def.power * 0.75 * diff(state).effect * f, def.power * 1.25 * diff(state).effect * f] : null,
+        recognition: [def.rec * 0.6 * (1 - p.recognition), def.rec * 1.3 * (1 - p.recognition)], viral: def.viral * (1 + dig), backfire: def.backfire, shield: def.shield };
+    },
+    run(state, prm, rng) {
+      const f = fatigue(state, 'social');
+      bumpFatigue(state, 'social');
+      const { campaign: c } = launchCampaign(state, def, prm, rng, f);
+      const lines = [];
+      if (c.viral) lines.push('🔥 Kampanya viral oldu! Etkisi 2,5 katına çıktı.');
+      if (c.backfire) lines.push('⚠️ Kampanya ters tepti; alay konusu oldu, etkisi düşük kaldı.');
+      if (def.shield) lines.push(`${def.weeks} hafta boyunca rakip saldırılarının etkisi yarıya inecek.`);
+      lines.push(`İlk hafta izlenme: ${fmtInt(c.views)}`, def.weeks > 1 ? `Kampanya ${def.weeks} hafta sürecek; Kampanya sekmesinden izleyebilirsin.` : 'Tek haftalık kampanya tamamlandı.');
+      if (c.province) lines.push(`${PROVINCE_BY_PLATE[c.province].name} için yerel etki eklendi.`);
+      return { title: def.label, bad: c.backfire, lines,
+        anim: { kind: 'social', def: def.id, viral: c.viral, backfire: c.backfire, views: c.views, likes: c.likes, shares: c.shares, comments: c.comments } };
+    },
+  })),
 
   // --- Teşkilat ---
   { id: 'buildOrg', cat: 'Teşkilat', icon: '🏢', label: 'İl teşkilatı kur', ap: 1, params: ['province'], foundOnly: true,
@@ -308,7 +321,7 @@ export const ACTIONS = [
     run(state, prm) {
       const p = playerParty(state), w = this.estimate(state).weeks;
       p.building[prm.province] = w;
-      return { title: `${PROVINCE_BY_PLATE[prm.province].name} il başkanlığı kuruluyor`, lines: [`${w} hafta içinde faaliyete geçecek.`] };
+      return { title: `${PROVINCE_BY_PLATE[prm.province].name} il başkanlığı kuruluyor`, lines: [`${w} hafta içinde faaliyete geçecek.`] , anim: { kind: 'org', plates: [prm.province], label: 'İl başkanlığı açılışı', color: p.color } };
     } },
   { id: 'buildRegion', cat: 'Teşkilat', icon: '🗺️', label: 'Bölge teşkilat hamlesi', ap: 3, params: ['region'], foundOnly: true,
     desc: 'Bir bölgedeki teşkilatı olmayan tüm illerde aynı anda il başkanlığı kur (%10 indirimli).',
@@ -328,7 +341,7 @@ export const ACTIONS = [
       const p = playerParty(state), w = this.estimate(state).weeks;
       const list = PROVINCES.filter(pv => pv.region === prm.region && !p.orgs[pv.plate] && !p.building[pv.plate]);
       for (const pv of list) p.building[pv.plate] = w;
-      return { title: `${prm.region} bölgesinde teşkilat hamlesi`, lines: [`${list.length} ilde il başkanlığı ${w} hafta içinde açılacak.`] };
+      return { title: `${prm.region} bölgesinde teşkilat hamlesi`, lines: [`${list.length} ilde il başkanlığı ${w} hafta içinde açılacak.`] , anim: { kind: 'org', plates: list.map(x => x.plate), label: `${prm.region} teşkilat hamlesi`, color: p.color } };
     } },
   { id: 'strengthenOrg', cat: 'Teşkilat', icon: '💪', label: 'Teşkilatı güçlendir', ap: 1, params: ['province'],
     desc: 'İlçe teşkilatları, gönüllü ağı ve sandık görevlileri. Oy ve sandık güvenliğine etki eder.',
@@ -346,7 +359,7 @@ export const ACTIONS = [
       const p = playerParty(state), e = this.estimate(state, prm);
       const g = rng.range(...e.org);
       p.orgs[prm.province] = clamp((p.orgs[prm.province] || 0) + g, 0, 1);
-      return { title: `${PROVINCE_BY_PLATE[prm.province].name} teşkilatı güçlendi`, lines: [`Teşkilat gücü ${pct(e.current, 0)} → ${pct(p.orgs[prm.province], 0)}`] };
+      return { title: `${PROVINCE_BY_PLATE[prm.province].name} teşkilatı güçlendi`, lines: [`Teşkilat gücü ${pct(e.current, 0)} → ${pct(p.orgs[prm.province], 0)}`] , anim: { kind: 'strengthen', from: e.current, to: p.orgs[prm.province], province: PROVINCE_BY_PLATE[prm.province].name, color: p.color } };
     } },
   { id: 'members', cat: 'Teşkilat', icon: '🪪', label: 'Üye kampanyası', ap: 1, desc: 'Yeni üyeler aidat geliri ve gönüllü demektir.',
     cost: () => 80000,
@@ -362,7 +375,7 @@ export const ACTIONS = [
       const p = playerParty(state), e = this.estimate(state);
       const m = Math.round(rng.range(...e.members));
       p.members += m; bumpFatigue(state, 'members');
-      return { title: 'Üye kampanyası', lines: [`${fmtInt(m)} yeni üye`] };
+      return { title: 'Üye kampanyası', lines: [`${fmtInt(m)} yeni üye`] , anim: { kind: 'members', count: m, total: p.members, color: p.color } };
     } },
   { id: 'fundraise', cat: 'Teşkilat', icon: '💰', label: 'Bağış kampanyası', ap: 1, desc: 'Bağış toplama yemeği ve kampanya. Küçük bir usulsüzlük riski var.',
     cost: () => 30000,
@@ -383,7 +396,7 @@ export const ACTIONS = [
         lines.push('⚠️ Bir bağışın kaynağı hakkında soru işaretleri doğdu; haberlere yansıdı.');
         addNews(state, 'player', `${p.short} hesabına yapılan bir bağışın kaynağı tartışma konusu oldu`);
       }
-      return { title: 'Bağış kampanyası', bad, lines };
+      return { title: 'Bağış kampanyası', bad, lines , anim: { kind: 'money', amount: m, bad, color: p.color } };
     } },
   { id: 'congress', cat: 'Teşkilat', icon: '🏛️', label: 'Büyük kongre düzenle', ap: 3, foundOnly: true,
     desc: 'Seçime katılabilmek için seçimden en az 6 ay önce büyük kongre yapılmış olmalı (en az 20 il teşkilatı gerekir — oyun kuralı).',
@@ -401,7 +414,7 @@ export const ACTIONS = [
       const u = rng.range(...e.unity), r = rng.range(...e.recognition);
       p.unity = clamp(p.unity + u, 0, 100); addRecognition(p, r); p.momentum += 0.03;
       addNews(state, 'player', `${p.name} ilk büyük kongresini yaptı; ${state.player.name} genel başkanlığa seçildi`);
-      return { title: 'Büyük kongre yapıldı', lines: ['Seçime katılım şartlarından biri sağlandı.', `Parti içi huzur +${u.toFixed(0)}`, `Tanınırlık +${pct(r, 1)}`] };
+      return { title: 'Büyük kongre yapıldı', lines: ['Seçime katılım şartlarından biri sağlandı.', `Parti içi huzur +${u.toFixed(0)}`, `Tanınırlık +${pct(r, 1)}`] , anim: { kind: 'congress', color: p.color, short: p.short } };
     } },
 
   // --- Parti içi ---
@@ -410,13 +423,13 @@ export const ACTIONS = [
     run(state, prm, rng) {
       const p = playerParty(state), u = rng.range(3, 8);
       p.unity = clamp(p.unity + u, 0, 100);
-      return { title: 'Parti içi toplantı', lines: [`İç huzur +${u.toFixed(0)}`] };
+      return { title: 'Parti içi toplantı', lines: [`İç huzur +${u.toFixed(0)}`] , anim: { kind: 'meeting', color: p.color } };
     } },
   { id: 'training', cat: 'Parti içi', icon: '🎓', label: 'Kadro eğitimi', ap: 1, desc: '8 hafta boyunca gaf riskini yarıya indirir; soru-cevap provası.',
     cost: () => 250000, estimate() { return { weeks: 8 }; },
     run(state) {
       state.flags.trainedUntil = addDays(state.date, 56);
-      return { title: 'Kadro eğitimi tamamlandı', lines: ['8 hafta boyunca gaf riski yarıya indi.'] };
+      return { title: 'Kadro eğitimi tamamlandı', lines: ['8 hafta boyunca gaf riski yarıya indi.'] , anim: { kind: 'training', color: playerParty(state).color } };
     } },
 ];
 
@@ -457,6 +470,11 @@ export function runAction(state, action, prm, rng) {
 export function describeEstimate(state, action, prm) {
   const e = action.estimate(state, prm);
   const out = [];
+  if (e.audience && Object.keys(e.audience).length) out.push(['Hedef kitle', Object.entries(e.audience).sort((a, b) => b[1] - a[1]).filter(([, v]) => v >= 0.5).map(([k]) => CLUSTERS.find(c => c.id === k).label).join(', ') || 'Geniş kitle']);
+  if (e.cluster) out.push(['Kitle etkisi', R(e.cluster[0], e.cluster[1], 3)]);
+  if (e.shield) out.push(['Kalkan', 'Rakip saldırıları −%50']);
+  if (e.backfire) out.push(['Ters tepme riski', pct(e.backfire, 0)]);
+  if (e.uturn) out.push(['Uyarı', 'Bu konuda farklı tutum almıştın (U dönüşü riski)']);
   if (e.live) out.push(['Biçim', 'Canlı yayın, 3 soru'], ['Etki', 'Cevaplarına göre her hizipte anlık değişir']);
   if (e.support) out.push(['Delege desteği', R(e.support[0], e.support[1], 1) + ' puan']);
   if (e.signatures) out.push(['İmza', `+${e.signatures[0].toFixed(1).replace('.', ',')} … +${e.signatures[1].toFixed(1).replace('.', ',')} puan`]);

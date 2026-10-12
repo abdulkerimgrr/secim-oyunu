@@ -63,6 +63,7 @@ function precompute(state, parties) {
       mom: p.momentum,
       econ: (p.govWeight || 0) * m * K.econ,
       tactical,
+      cmom: state.clusterMom?.[p.id] || null,
       dist: CLUSTERS.map(c => ideologyDistance(c.ideo, p.ideology)),
     };
   });
@@ -110,7 +111,7 @@ export function project(state, { ballotOnly = false, noise = null } = {}) {
       let mx = -Infinity;
       for (let j = 0; j < nP; j++) {
         const q = pre[j];
-        const v = unitBase[j] - cl.lambda * q.dist[c] - q.econ * cl.econ + cl.flex * (q.mom + (camp[q.p.id] || 0));
+        const v = unitBase[j] - cl.lambda * q.dist[c] - q.econ * cl.econ + cl.flex * (q.mom + (camp[q.p.id] || 0) + (q.cmom ? q.cmom[c] : 0));
         util[j] = v; if (v > mx) mx = v;
       }
       let s = 0;

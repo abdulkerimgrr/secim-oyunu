@@ -36,6 +36,7 @@ Haziran 2023 genel başkanları, YSK aday listesindeki parti başkanlarıdır. C
 - Delege sayıları (CHP ≈1.370, AKP ≈1.450 vb.) ve adaylık için %20 delege imzası şartı **tahmini**; parti tüzükleriyle doğrulanmalı (`data/factions.js`).
 - Hizipler (genel merkez yönetimi, il ve ilçe başkanları, değişimciler, ideolojik çekirdek) genelleştirilmiş **tasarım** kategorileridir; gerçek kişi veya grupları temsil etmez.
 - Canlı yayın programları, kanallar ve sunucular kurgusaldır (`data/tv.js`).
+- Gazeteler, yorumcular ve sosyal medyadaki vatandaşlar kurgusaldır (`data/press.js`); platform adları tarif edicidir (`data/social.js`). Hükümet ve gerçek partilerin tepkileri doğrudan alıntı olmadan, oyun içi özet olarak verilir.
 
 ## Tasarım varsayımları
 Parti ideoloji konumları, seçmen kümeleri ve bunların payları (2023 oylarından türetilir), medya erişimi, lider karizması, bütçe kalemleri ve tüm denge katsayıları (`engine/params.js`) oyun tasarımıdır. Gerçek kişi veya kurumlar hakkında iddia içermez. Olay havuzundaki tüm olaylar kurgusaldır.

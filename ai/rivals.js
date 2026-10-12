@@ -31,7 +31,7 @@ export function rivalsAct(state, rng, scale = 1) {
       const r = rng.next();
       const eff = (0.6 + 0.4 * p.media) * diff.rival;
       if (threat && r < 0.15 + Math.min(0.25, myPoll * 3)) {
-        me.momentum -= rng.range(0.005, 0.02) * eff;
+        me.momentum -= rng.range(0.005, 0.02) * eff * (state.flags.shieldUntil && state.flags.shieldUntil >= state.date ? 0.5 : 1);
         if (newsBudget-- > 0) addNews(state, 'rival', fill(rng.pick(NEWS_TEMPLATES.attackPlayer), { party: p.short, target: me.short }));
       } else if (isOpp && misery > 3 && r < 0.4) {
         p.momentum += rng.range(0.003, 0.012) * eff;
