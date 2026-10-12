@@ -34,6 +34,21 @@ const HAIR_FRONT = {
     dalgali: 'M34 58 Q28 26 46 24 Q54 17 64 22 Q76 18 84 30 Q90 40 86 58 Q83 40 72 36 Q62 42 54 36 Q42 40 34 58 Z',
   },
 };
+// Kıvırcık saç: üst kafada bukle kümeleri
+function curls(hair, hi, female) {
+  const pts = [];
+  for (let i = 0; i <= 12; i++) {
+    const a = Math.PI * (1.02 + i / 12 * 0.96);
+    pts.push([60 + Math.cos(a) * 25, 52 + Math.sin(a) * 27, 7.5 - Math.abs(i - 6) * 0.15]);
+  }
+  for (const x of [46, 56, 66, 74]) pts.push([x, 31 + (x % 4), 6.5]);
+  if (female) for (const [x, y] of [[33, 66], [87, 66], [32, 80], [88, 80], [35, 93], [85, 93]]) pts.push([x, y, 7]);
+  else pts.push([36.5, 58, 5], [83.5, 58, 5]);
+  let g = pts.map(([x, y, r]) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="${hair}"/>`).join('');
+  g += pts.filter((_, i) => i % 2 === 0).map(([x, y, r]) => `<path d="M${(x - r * 0.5).toFixed(1)} ${(y - r * 0.2).toFixed(1)} q${(r * 0.5).toFixed(1)} ${(-r * 0.6).toFixed(1)} ${r.toFixed(1)} 0" fill="none" stroke="${hi}" stroke-width="1" opacity=".55"/>`).join('');
+  return g;
+}
+
 const BROWS = {
   ince: { w: 1.4, d: 'M46 50.5 Q51 48.5 56 50 M64 50 Q69 48.5 74 50.5' },
   normal: { w: 2.4, d: 'M46 50.5 Q51 47.5 56 50 M64 50 Q69 47.5 74 50.5' },
@@ -48,6 +63,16 @@ const NOSE = {
 
 export function avatarSvg(c, { size = 120, bg = '#E6EBF3', ring = null, mood = 'smile', pin } = {}) {
   const id = 'av' + (++uid);
+  // Oyuncunun yüklediği fotoğraf (yalnızca bu tarayıcıda, kayıt içinde saklanır)
+  if (c.photo && /^data:image\/(jpeg|png|webp);base64,/.test(c.photo)) {
+    const pc = pin ?? (c.pin !== false ? c.pinColor : null);
+    return `<svg viewBox="0 0 120 140" width="${size}" height="${Math.round(size * 140 / 120)}" role="img" aria-label="Karakter fotoğrafı" style="display:block">
+      <defs><clipPath id="${id}c"><rect width="120" height="140" rx="6"/></clipPath></defs>
+      ${bg === 'transparent' ? '' : `<rect width="120" height="140" fill="${bg}"/>`}
+      <image href="${c.photo}" width="120" height="140" preserveAspectRatio="xMidYMid slice" clip-path="url(#${id}c)"/>
+      ${ring ? `<rect x="1.5" y="1.5" width="117" height="137" rx="6" fill="none" stroke="${ring}" stroke-width="3"/>` : ''}
+      ${pc ? `<circle cx="104" cy="124" r="5" fill="${pc}" stroke="#E9D8A6" stroke-width="1.4"/>` : ''}</svg>`;
+  }
   const skin = c.skin || '#EBC2A3', sk2 = shade(skin, -0.12), sk3 = shade(skin, -0.22), skHi = shade(skin, 0.08);
   const hair = c.hairColor || '#1E1A18', hairHi = shade(hair, hair === '#1E1A18' ? 1.4 : 0.35);
   const suit = c.suit || '#1F2A44', acc = c.accent || '#B3202E';
@@ -69,7 +94,10 @@ export function avatarSvg(c, { size = 120, bg = '#E6EBF3', ring = null, mood = '
   if (scarf) g += `<path d="M28 62 Q26 22 60 21 Q94 22 92 62 Q94 96 80 110 L40 110 Q26 96 28 62 Z" fill="${c.scarf || '#1F5FA8'}"/><path d="M34 40 Q60 26 86 40" fill="none" stroke="${shade(c.scarf || '#1F5FA8', 0.25)}" stroke-width="2" opacity=".6"/>`;
   // Gövde ve kıyafet
   const body = 'M6 140 C8 113 28 101 60 99 C92 101 112 113 114 140 Z';
-  if (outfit === 'kazak') {
+  if (outfit === 'kapusonlu') {
+    g += `<path d="${body}" fill="url(#${id}s)"/><path d="M30 122 Q34 132 33 140 M90 122 Q86 132 87 140" fill="none" stroke="${shade(suit, -0.25)}" stroke-width="1.4"/>`;
+    g += `<rect x="${female ? 70 : 72}" y="118" width="8" height="3.4" rx="1.2" fill="#F4F4F2" opacity=".9"/>`;
+  } else if (outfit === 'kazak') {
     g += `<path d="${body}" fill="url(#${id}s)"/><path d="M47 100 Q60 112 73 100" fill="none" stroke="${shade(suit, -0.3)}" stroke-width="3"/>`;
     if (!female) g += `<path d="M50 100 L60 110 L70 100" fill="#F2F2EE"/>`;
   } else if (outfit === 'gomlek' || outfit === 'bluz') {
@@ -93,7 +121,9 @@ export function avatarSvg(c, { size = 120, bg = '#E6EBF3', ring = null, mood = '
     g += `<path d="M50 80 L50 100 Q60 108 70 100 L70 80 Z" fill="${sk2}"/><path d="M50 86 Q60 94 70 86 L70 80 L50 80 Z" fill="${sk3}" opacity=".5"/>`;
     g += `<ellipse cx="36" cy="61" rx="4.2" ry="6.8" fill="${sk2}"/><ellipse cx="84" cy="61" rx="4.2" ry="6.8" fill="${sk2}"/><path d="M35 58 Q37 61 35.5 64 M85 58 Q83 61 84.5 64" fill="none" stroke="${sk3}" stroke-width="1"/>`;
   }
+  if (outfit === 'kapusonlu' && !scarf) g += `<path d="M38 104 Q40 94 50 95 Q60 106 70 95 Q80 94 82 104 Q72 116 60 117 Q48 116 38 104 Z" fill="${shade(suit, -0.12)}"/><path d="M42 103 Q60 120 78 103" fill="none" stroke="${shade(suit, -0.32)}" stroke-width="1.2"/><path d="M54 112 L53 127 M66 112 L67 127" stroke="#E8E8E4" stroke-width="1.3" stroke-linecap="round"/>`;
   g += scarf ? `<ellipse cx="60" cy="61" rx="20" ry="25" fill="url(#${id}f)"/>` : `<path d="${head}" fill="url(#${id}f)"/>`;
+  if (c.earring === 'var' && !scarf) g += `<circle cx="85" cy="67.5" r="1.5" fill="none" stroke="#D8D8D8" stroke-width="1"/>`;
   // Çene gölgesi ve elmacık
   g += `<path d="M44 74 Q60 90 76 74" fill="none" stroke="${sk2}" stroke-width="3" opacity=".25"/>`;
   // Yaş çizgileri
@@ -103,6 +133,7 @@ export function avatarSvg(c, { size = 120, bg = '#E6EBF3', ring = null, mood = '
   // Saç
   if (!scarf) {
     if (female && c.hairStyle === 'topuz') g += `<circle cx="60" cy="20" r="10" fill="${hair}"/><circle cx="60" cy="20" r="10" fill="url(#${id}h)"/>`;
+    if (c.hairStyle === 'kivircik') g += curls(hair, hairHi, female);
     const front = HAIR_FRONT[female ? 'k' : 'e'][c.hairStyle];
     if (front) g += `<path d="${front}" fill="${hair}"/><path d="${front}" fill="url(#${id}h)"/>`;
     if (!female && c.hairStyle === 'seyrek') g += `<path d="M42 38 Q60 31 78 38 Q60 35 42 38 Z" fill="${hair}" opacity=".5"/>`;

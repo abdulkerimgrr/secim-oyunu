@@ -2,6 +2,7 @@
 import { RULES } from '../data/rules.js';
 import { PARTIES_2023, ALLIANCES_2023, ELECTION_DAY_ALLIANCES_2023 } from '../data/parties2023.js';
 import { SCENARIO_2023 } from '../data/scenario2023.js';
+import { SCENARIO_TODAY, PARTY_OVERRIDES, NEW_PARTIES, SEATS_TODAY, POLL_TARGETS } from '../data/scenarioToday.js';
 import { RESULTS_2023 } from '../data/generated/results2023.js';
 import { PROVINCES } from '../data/generated/provinces.js';
 import { FIRST_NAMES, LAST_NAMES, SKILLS } from '../data/founders.js';
@@ -59,9 +60,43 @@ function makeParty(def, scenario, provShares) {
   };
 }
 
+export const SCENARIOS = { '2023': SCENARIO_2023, bugun: SCENARIO_TODAY };
+
+// Senaryoya göre parti tanımları (yeni oyun ekranındaki listeler için de kullanılır)
+export function scenarioParties(id) {
+  if (id !== 'bugun') return PARTIES_2023;
+  const base = PARTIES_2023.map(d => ({ ...d, ...(PARTY_OVERRIDES[d.id] || {}) }));
+  const out = [...base.filter(d => !d.aggregate), ...NEW_PARTIES, ...base.filter(d => d.aggregate)];
+  return out.sort((a, b) => (POLL_TARGETS[b.id] || 0) - (POLL_TARGETS[a.id] || 0) || (a.aggregate ? 1 : 0) - (b.aggregate ? 1 : 0));
+}
+export const scenarioShares = id => id === 'bugun' ? POLL_TARGETS : null;
+
+// "Bugün" senaryosu: 2023 kalibrasyonunun üzerine sonradan kurulan partileri ekle ve ulusal eğilimi anketlere yaklaştır
+function applyToday(state, provShares) {
+  for (const def of NEW_PARTIES) {
+    const p = makeParty(def, SCENARIO_TODAY, provShares);
+    const src = state.parties[def.baseFrom];
+    for (const pl of Object.keys(src.orgs)) { p.orgs[pl] = +(src.orgs[pl] * 0.85).toFixed(3); src.orgs[pl] = +(src.orgs[pl] * 0.6).toFixed(3); }
+    state.parties[def.id] = p;
+    for (const u of state.units) u.E[def.id] = u.E[def.baseFrom];
+  }
+  for (let it = 0; it < 40; it++) {
+    const pr = project(state);
+    let err = 0;
+    for (const [id, t] of Object.entries(POLL_TARGETS)) {
+      const cur = Math.max(1e-6, pr.national[id] || 0);
+      const d = Math.log(t / cur) * 0.9;
+      err = Math.max(err, Math.abs(t - cur));
+      for (const u of state.units) u.E[id] = (u.E[id] ?? -14) + d;
+    }
+    if (err < 0.0005) break;
+  }
+}
+
 export function newGame(opts) {
   const seed = opts.seed ?? (Date.now() % 2147483647);
-  const scenario = SCENARIO_2023;
+  const scenario = SCENARIOS[opts.scenario] || SCENARIO_2023;
+  const today = scenario.id === 'bugun';
   const diff = DIFFICULTY[opts.difficulty || 'zor'];
   const rng = createRng(seed);
 
@@ -105,8 +140,9 @@ export function newGame(opts) {
     player: null,
   };
   state.economy.misery0 = misery(state.economy);
+  if (scenario.policyRate) state.economy.policyRate = scenario.policyRate;
   ensureGovState(state);
-  for (const def of PARTIES_2023) state.parties[def.id] = makeParty(def, scenario, provShares);
+  for (const def of scenarioParties(scenario.id).filter(d => !NEW_PARTIES.includes(d))) state.parties[def.id] = makeParty(def, scenario, provShares);
   calibrate(state, targets);
 
   // 2023 meclisi: kalibre edilmiş model + D'Hondt (gürültüsüz) = gerçek sonuç
@@ -122,6 +158,15 @@ export function newGame(opts) {
     p.members = Math.round(p.lastShare * 11_000_000); // üye sayısı: kabaca orantılı — tahmini
   }
   state.elections.push({ date: '2023-05-14', type: 'genel', national: base.national, seats: seats.seats, real: true });
+  if (today) {
+    applyToday(state, provShares);
+    state.parliament = { seats: { ...SEATS_TODAY }, date: scenario.parliamentDate };
+    for (const p of Object.values(state.parties)) {
+      p.seats = SEATS_TODAY[p.id] || 0;
+      p.lastShare = POLL_TARGETS[p.id] || 0;
+      p.members = Math.round(p.lastShare * 11_000_000); // — tahmini
+    }
+  }
 
   // Oyuncu
   const character = opts.character ? deepClone(opts.character) : randomCharacter(() => rng.next());
@@ -168,7 +213,7 @@ export function newGame(opts) {
   state.rngState = rng.state;
   takePoll(state, rng);
   state.rngState = rng.state;
-  state.news.push({ date: state.date, kind: 'info', text: 'TBMM 28. Dönem çalışmalarına başladı. Cumhur İttifakı meclis çoğunluğunu korudu.' });
+  for (const t of scenario.news || ['TBMM 28. Dönem çalışmalarına başladı. Cumhur İttifakı meclis çoğunluğunu korudu.']) state.news.push({ date: state.date, kind: 'info', text: t });
   if (opts.mode === 'found') state.news.push({ date: state.date, kind: 'player', text: `${state.parties[PLAYER_ID].name} kuruluş dilekçesini İçişleri Bakanlığı'na verdi.` });
   return state;
 }

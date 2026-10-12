@@ -5,13 +5,13 @@ import { PARTIES_2023, AXES } from '../../data/parties2023.js';
 import { SKILLS } from '../../data/founders.js';
 import { RESULTS_2023 } from '../../data/generated/results2023.js';
 import { DIFFICULTY } from '../../engine/params.js';
-import { newGame, generateFounders } from '../../engine/state.js';
+import { newGame, generateFounders, scenarioParties, scenarioShares } from '../../engine/state.js';
 import { loadGame, slotInfo, SLOTS, deleteSlot } from '../../engine/save.js';
 import { soundToggleHtml, bindSoundToggle, sfx } from '../sound.js';
 import { sheet } from '../dom.js';
 import { audioSettingsHtml, bindAudioSettings } from '../audioSettings.js';
 import { fmtDate, pct } from '../../engine/util.js';
-import { LOOKS, PROFESSIONS, EDUCATION, TRAITS, randomCharacter } from '../../data/character.js';
+import { LOOKS, PROFESSIONS, EDUCATION, TRAITS, PRESET_LOOKS, randomCharacter } from '../../data/character.js';
 import { PROVINCES } from '../../data/generated/provinces.js';
 import { avatarSvg } from '../avatar.js';
 import { mixColor } from '../map.js';
@@ -27,7 +27,7 @@ const PRESETS = {
   'Liberal': { eko: 0.8, din: -0.3, milli: -0.1, yerel: 0.4, dis: -0.7, ozg: 0.8, deger: 0.4 },
   'Yeşil sol': { eko: -0.8, din: -0.6, milli: -0.5, yerel: 0.7, dis: -0.1, ozg: 0.9, deger: 0.8 },
 };
-const JOIN_DIFF = { AKP: 'Neredeyse imkânsız', MHP: 'Neredeyse imkânsız', CHP: 'Zor', IYI: 'Çok zor', YSP: 'Çok zor', YRP: 'Çok zor', ZP: 'Çok zor', TIP: 'Zor', BBP: 'Çok zor', MP: 'Zor' };
+const JOIN_DIFF = { AKP: 'Neredeyse imkânsız', MHP: 'Neredeyse imkânsız', CHP: 'Zor', IYI: 'Çok zor', YSP: 'Çok zor', YENI: 'Çok zor', YRP: 'Çok zor', ZP: 'Çok zor', TIP: 'Zor', BBP: 'Çok zor', MP: 'Zor' };
 
 let w = null;
 function reset() {
@@ -48,7 +48,7 @@ export function renderNewGame(view, ctx) {
   } else if (w.step === 'year') {
     html = `<h1 style="font-size:30px">Başlangıç yılı</h1><p class="muted">Seçtiğin yılın partileri, meclisi ve ekonomisi yüklenir.</p>
       <div class="grid2">${START_YEARS.map(y => `<button class="select-card ${w.year === y.id ? 'on' : ''}" data-year="${y.id}" ${y.available ? '' : 'disabled'}>
-        <div><div style="font-family:var(--f-display);font-size:26px;font-weight:700">${y.label}</div><div class="small muted">${y.available ? 'Haziran 2023: seçim sonrası' : 'Sonraki aşamada'}</div></div></button>`).join('')}</div>
+        <div><div style="font-family:var(--f-display);font-size:26px;font-weight:700">${y.label}</div><div class="small muted">${y.id === 'bugun' ? 'Ekim 2026: güncel meclis ve ekonomi' : y.available ? 'Haziran 2023: seçim sonrası' : 'Sonraki aşamada'}</div></div></button>`).join('')}</div>
       <div class="grid2">${back('splash')}<button class="btn primary" data-next="mode">Devam</button></div>`;
   } else if (w.step === 'mode') {
     html = `<h1 style="font-size:30px">Yolunu seç</h1>
@@ -82,11 +82,13 @@ export function renderNewGame(view, ctx) {
     const tot = {};
     for (const r of RESULTS_2023) for (const [k, v] of Object.entries(r.votes)) tot[k] = (tot[k] || 0) + v;
     const T = Object.values(tot).reduce((a, b) => a + b, 0);
+    const sh = scenarioShares(w.year);
+    const shareTxt = p => sh ? `anket ort.: ${pct(sh[p.id] || 0)}` : `2023: ${pct(tot[p.id] / T)}`;
     html = `<h1 style="font-size:30px">Hangi partiye?</h1><p class="muted">Genel başkan adayı olarak kurultaya gideceksin. Mevcut liderin etkisi ve delege yapısı zorluğu belirler.</p>
-      <div class="list card">${PARTIES_2023.filter(p => !p.aggregate).map(p => `<button class="li" data-join="${p.id}" style="background:${w.joinPartyId === p.id ? '#EEF2F9' : 'none'};border:0;text-align:left;width:100%">
+      <div class="list card">${scenarioParties(w.year).filter(p => !p.aggregate).map(p => `<button class="li" data-join="${p.id}" style="background:${w.joinPartyId === p.id ? '#EEF2F9' : 'none'};border:0;text-align:left;width:100%">
         <span class="badge" style="background:${p.color}">${esc(p.short)}</span>
-        <div class="grow"><div class="t">${esc(p.name)}</div><div class="small muted">Genel başkan: ${esc(p.leader)} · 2023: ${pct(tot[p.id] / T)}${p.kurultay ? ` · kurultay ${fmtDate(p.kurultay)}` : ' · olağanüstü kurultay senaryosu (14 hafta)'}</div></div>
-        <span class="pill ${JOIN_DIFF[p.id].startsWith('Zor') ? 'warn' : 'bad'}">${JOIN_DIFF[p.id]}</span></button>`).join('')}</div>
+        <div class="grow"><div class="t">${esc(p.name)}</div><div class="small muted">Genel başkan: ${esc(p.leader)} · ${shareTxt(p)}${p.kurultay ? ` · kurultay ${fmtDate(p.kurultay)}` : ' · olağanüstü kurultay senaryosu (16 hafta)'}</div>${p.note ? `<div class="small muted" style="opacity:.8">${esc(p.note)}</div>` : ''}</div>
+        <span class="pill ${(JOIN_DIFF[p.id] || 'Zor').startsWith('Zor') ? 'warn' : 'bad'}">${JOIN_DIFF[p.id] || 'Zor'}</span></button>`).join('')}</div>
       <div class="grid2">${back('mode')}<button class="btn primary" data-next="character" ${w.joinPartyId ? '' : 'disabled'}>Devam</button></div>`;
   } else if (w.step === 'final') {
     const c = w.character;
@@ -137,14 +139,14 @@ export function renderNewGame(view, ctx) {
     saveForm();
     if (w.party.name.length < 3) return toast('Parti adı en az 3 harf olmalı.');
     if (w.party.short.length < 2) return toast('Kısaltma en az 2 harf olmalı.');
-    if (PARTIES_2023.some(p => p.short.toLocaleUpperCase('tr') === w.party.short)) return toast('Bu kısaltma başka bir partiye ait.');
+    if (scenarioParties(w.year).some(p => p.short.toLocaleUpperCase('tr') === w.party.short)) return toast('Bu kısaltma başka bir partiye ait.');
     if (w.founders.length !== 3) return toast('3 kurucu üye seç.');
     go('character');
   });
   if (w.step === 'character') bindCharacter(view, ctx, go);
   view.querySelector('[data-a=start]')?.addEventListener('click', () => {
     saveForm();
-    const state = newGame({ character: w.character,
+    const state = newGame({ character: w.character, scenario: w.year,
       mode: w.mode, seed: w.seed, difficulty: w.difficulty, playerName: w.playerName, joinPartyId: w.joinPartyId,
       party: w.party, founders: w.founderPool.filter(f => w.founders.includes(f.id)),
     });
@@ -153,10 +155,10 @@ export function renderNewGame(view, ctx) {
   });
 }
 
-function pinColor() { return w.mode === 'join' ? (PARTIES_2023.find(p => p.id === w.joinPartyId)?.color || '#C8102E') : w.party.color; }
+function pinColor() { return w.mode === 'join' ? (scenarioParties(w.year).find(p => p.id === w.joinPartyId)?.color || '#C8102E') : w.party.color; }
 
 function avatarBg() {
-  const col = w.mode === 'join' ? (PARTIES_2023.find(p => p.id === w.joinPartyId)?.color || '#14213D') : w.party.color;
+  const col = w.mode === 'join' ? (scenarioParties(w.year).find(p => p.id === w.joinPartyId)?.color || '#14213D') : w.party.color;
   return mixColor('#FFFFFF', col, 0.22);
 }
 
@@ -180,6 +182,12 @@ function characterStep() {
         <button class="btn" type="button" data-a="random">🎲 Rastgele görünüm</button>
       </div>
     </div>
+    <section class="card charsec"><h2>Hazır görünümler <small>tek dokunuşla uygula, sonra düzenle</small></h2>
+      <div class="presetlooks">${PRESET_LOOKS.map(p => `<button type="button" class="select-card presetlook" data-preset-look="${p.id}">${avatarSvg({ ...c, ...p.look, photo: null }, { size: 56, bg: '#E6EBF3' })}<span class="small"><b>${esc(p.label)}</b></span></button>`).join('')}
+        <label class="select-card presetlook photo-up"><span style="font-size:30px">📷</span><span class="small"><b>Kendi fotoğrafın</b><br><span class="muted">yalnızca bu cihazda saklanır</span></span><input type="file" id="f-photo" accept="image/*" hidden></label>
+      </div>
+      ${c.photo ? `<button type="button" class="btn small-btn" data-a="photo-del" style="margin-top:8px">Fotoğrafı kaldır, çizimi kullan</button>` : ''}
+    </section>
     <section class="card charsec"><h2>Görünüm</h2>
       <div class="f">Cinsiyet${chips('gender', LOOKS.gender, c.gender)}</div>
       <div class="f">Ten rengi${swatches('skin', LOOKS.skin, c.skin)}</div>
@@ -192,8 +200,9 @@ function characterStep() {
       <div class="f">Burun${chips('nose', LOOKS.nose, c.nose || 'orta')}</div>
       <div class="f">Dudaklar${chips('lips', LOOKS.lips, c.lips || 'orta')}</div>
       <div class="f">Gözlük${chips('glasses', LOOKS.glasses, c.glasses)}</div>
+      ${c.hairStyle !== 'basortu' ? `<div class="f">Küpe${chips('earring', LOOKS.earring, c.earring || 'yok')}</div>` : ''}
       <div class="f">Kıyafet${chips('outfit', LOOKS.outfit[c.gender], c.outfit || 'takim')}</div>
-      <div class="f">${c.outfit === 'gomlek' || c.outfit === 'bluz' ? 'Kıyafet rengi' : 'Ceket rengi'}${swatches('suit', LOOKS.suit, c.suit)}</div>
+      <div class="f">${['gomlek', 'bluz', 'kapusonlu', 'kazak'].includes(c.outfit) ? 'Kıyafet rengi' : 'Ceket rengi'}${swatches('suit', LOOKS.suit, c.suit)}</div>
       <div class="f">${female ? 'Bluz / aksesuar' : 'Kravat'}${swatches('accent', LOOKS.accent, c.accent)}</div>
       <label class="aset-row" style="font-size:13px"><span>Yakada parti rozeti</span><input type="checkbox" id="f-pin" ${c.pin !== false ? 'checked' : ''}></label>
     </section>
@@ -234,9 +243,34 @@ function bindCharacter(view, ctx, go) {
     c.traits = c.traits.includes(id) ? c.traits.filter(t => t !== id) : [...c.traits, id].slice(0, 2);
     rerender();
   });
+  view.querySelectorAll('[data-preset-look]').forEach(b => b.onclick = () => {
+    const pl = PRESET_LOOKS.find(x => x.id === b.dataset.presetLook);
+    Object.assign(c, pl.look); delete c.photo;
+    rerender();
+  });
+  view.querySelector('[data-a=photo-del]')?.addEventListener('click', () => { delete c.photo; rerender(); });
+  view.querySelector('#f-photo')?.addEventListener('change', e => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      // 240×280'e kırp ve küçült (kayıt boyutu küçük kalsın)
+      const W = 240, H = 280, cv = document.createElement('canvas');
+      cv.width = W; cv.height = H;
+      const r = Math.max(W / img.width, H / img.height);
+      const sw = W / r, sh = H / r;
+      cv.getContext('2d').drawImage(img, (img.width - sw) / 2, Math.max(0, (img.height - sh) * 0.3), sw, sh, 0, 0, W, H);
+      c.photo = cv.toDataURL('image/jpeg', 0.82);
+      URL.revokeObjectURL(url);
+      rerender();
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); toast('Fotoğraf okunamadı.'); };
+    img.src = url;
+  });
   view.querySelector('[data-a=random]').onclick = () => {
     const keep = { profession: c.profession, education: c.education, hometown: c.hometown, traits: c.traits };
-    w.character = { ...randomCharacter(), ...keep };
+    w.character = { ...randomCharacter(), ...keep }; // fotoğraf da kaldırılır
     rerender();
   };
   view.querySelector('[data-a=char-next]').onclick = () => {

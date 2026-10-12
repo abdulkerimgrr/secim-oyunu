@@ -46,3 +46,23 @@ Haziran 2023 genel başkanları, YSK aday listesindeki parti başkanlarıdır. C
 
 ## Tasarım varsayımları
 Parti ideoloji konumları, seçmen kümeleri ve bunların payları (2023 oylarından türetilir), medya erişimi, lider karizması, bütçe kalemleri ve tüm denge katsayıları (`engine/params.js`) oyun tasarımıdır. Gerçek kişi veya kurumlar hakkında iddia içermez. Olay havuzundaki tüm olaylar kurgusaldır.
+
+## "Bugün" senaryosu — Ekim 2026 (`data/scenarioToday.js`)
+| Veri | Değer | Durum / kaynak |
+|---|---|---|
+| Yıllık enflasyon | %29,7 (Eylül 2026) | kaynaklı — TÜİK (SBB enflasyon sayfası üzerinden) |
+| Politika faizi | %37 (10 Eylül 2026 PPK) | kaynaklı — TCMB; GCM Yatırım, Bigpara |
+| İşsizlik | %7,8 (Ağustos 2026) | kaynaklı — TÜİK (30 Eylül 2026 bülteni) |
+| Dolar/TL | ≈49,3 (9 Ekim 2026) | kaynaklı — Investing.com, Foreks |
+| Büyüme | %3,5 | **tahmini** |
+| TBMM dağılımı | AK Parti 280, Yeni Parti 91, DEM 56, MHP 46, CHP 44, İYİ 27, Yeni Yol 20, diğer/bağımsız 28 (592 dolu) | kaynaklı — Cumhuriyet, Anka, Euronews (Temmuz–Ekim 2026); Yeni Yol ve küçük gruplar oyunda "Diğer"de |
+| Yeni Parti | 24 Temmuz 2026, Özgür Özel ve CHP'den ayrılan milletvekilleri | kaynaklı — Euronews, Yetkin Report, Vikipedi |
+| CHP genel başkanı | Kemal Kılıçdaroğlu, "mutlak butlan" kararı sonrası tedbiren (Mayıs 2026) | kaynaklı — Vikipedi; hukuki süreç sürüyor |
+| İYİ Parti | Müsavat Dervişoğlu | kaynaklı — iyiparti.org.tr |
+| DEM Parti | Tülay Hatimoğulları – Tuncer Bakırhan | kaynaklı — chp.org.tr haberi (Haziran 2026) |
+| Zafer Partisi | Ümit Özdağ | kaynaklar tutarsız — **tahmini** |
+| Seçmen eğilimi | AK Parti %33,8 · Yeni %23,5 · DEM %9,3 · MHP %8,2 · İYİ %7,1 · CHP %6,0 · ZP %3,4 · YRP %2,9 | **tahmini** — ASAL (Eylül, Ekim 2026) ve GENAR (Eylül 2026) anketlerinin yaklaşık ortalaması |
+| İl dağılımı | Yeni Parti'nin il bazında oyu CHP'nin 2023 dağılımından türetilir | **tasarım** |
+
+## Cumhurbaşkanlığı krizleri
+Bakan istifaları, skandallar ve kabine krizleri kurgusal senaryolardır. Meclis denetimi Anayasa m.106'ya göre modellenir: gensoru 2017'de kaldırıldı; Meclis soruşturması önergesi üye tamsayısının salt çoğunluğuyla (301) verilir, soruşturma açılması için 3/5 (360) oy gerekir (kaynaklı, sadeleştirilmiş).

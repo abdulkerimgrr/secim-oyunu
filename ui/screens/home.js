@@ -155,7 +155,7 @@ function statusCard(s) {
 function calendar(s) {
   const items = [];
   if (s.player.mode === 'join' && !s.player.isLeader) items.push([s.player.kurultay.date, `${playerParty(s).short} kurultayı`, 'Kurultay']);
-  if (s.localElection) items.push([s.localElection, '2024 Yerel seçimler (basitleştirilmiş)', 'Seçim']);
+  if (s.localElection) items.push([s.localElection, `${s.localElection.slice(0, 4)} Yerel seçimler (basitleştirilmiş)`, 'Seçim']);
   items.push([addDays(s.nextElection, -s.rules.campaignDays), 'Seçim kampanyası başlar (günlük tur)', 'Takvim']);
   items.push([s.nextElection, 'Milletvekili genel seçimi', 'Seçim']);
   if (s.player.mode === 'found') items.push([addDays(s.nextElection, -s.rules.partyEligibility.congressMonthsBefore * 30), 'Büyük kongre için son tarih', 'Yasal']);
@@ -193,6 +193,6 @@ export function renderHome(view, ctx) {
     <div class="stat"><div class="v">%${e.unemployment.toFixed(1).replace('.', ',')}</div><div class="l">İşsizlik</div></div>
     <div class="stat"><div class="v">${e.usdTry.toFixed(2).replace('.', ',')}</div><div class="l">Dolar/TL</div></div>
     <div class="stat"><div class="v">%${e.growth.toFixed(1).replace('.', ',')}</div><div class="l">Büyüme</div></div></div>
-    <p class="small muted" style="margin:8px 0 0">Ekonomik hoşnutsuzluk iktidar partilerinin oyunu aşındırır. Başlangıç değerleri Haziran 2023'e yakın tahminlerdir.</p></section>`);
+    <p class="small muted" style="margin:8px 0 0">Ekonomik hoşnutsuzluk iktidar partilerinin oyunu aşındırır. Başlangıç değerleri ${s.scenario === 'bugun' ? 'Ekim 2026 resmî verileridir (TÜİK, TCMB)' : 'Haziran 2023\'e yakın tahminlerdir'}.</p></section>`);
   view.querySelectorAll('[data-go]').forEach(b => b.onclick = () => ctx.go(b.dataset.go));
 }

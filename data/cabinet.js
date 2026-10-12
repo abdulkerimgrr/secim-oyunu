@@ -8,5 +8,5 @@ export const CABINET_POSTS = [
   { id: 'saglik', label: 'Sağlık Bakanı', icon: '🏥', effect: 'Onay oranı' },
 ];
 export const MINISTER_FIRST = ['Ahmet', 'Selma', 'Kemal', 'Nur', 'Halil', 'Fikriye', 'Recai', 'Aslı', 'Taner', 'Leman', 'Orhan', 'Şule', 'Vedat', 'Filiz', 'Yaşar', 'Canan'];
-export const MINISTER_LAST = ['Akçay', 'Demirtaş', 'Sezgin', 'Karaca', 'Oral', 'Şimşekli', 'Ekinci', 'Gündoğdu', 'Turan', 'Baysal', 'Erkan', 'Yalın', 'Kocabaş', 'Tamer', 'Uzun', 'Altay'];
+export const MINISTER_LAST = ['Akçay', 'Demirci', 'Sezgin', 'Karaca', 'Oral', 'Şenkal', 'Ekinci', 'Gündoğdu', 'Turan', 'Baysal', 'Erkan', 'Yalın', 'Kocabaş', 'Tamer', 'Uzun', 'Altay'];
 export const PROFILES = [['teknokrat', 'Teknokrat'], ['siyasetci', 'Siyasetçi'], ['akademisyen', 'Akademisyen'], ['burokrat', 'Bürokrat']];

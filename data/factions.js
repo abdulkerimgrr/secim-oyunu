@@ -23,6 +23,8 @@ export const PARTY_KURULTAY = {
          factions: { yonetim: [0.55, 0.5], teskilat: [0.3, 1.5], degisimci: [0.05, 12], cekirdek: [0.1, 2] } },
   CHP: { delegates: 1370, signatures: 0.2, pull: 0.17, cekirdek: 'Ulusalcı-Kemalist kanat',
          factions: { yonetim: [0.35, 2], teskilat: [0.27, 14], degisimci: [0.24, 34], cekirdek: [0.14, 10] } },
+  YENI: { delegates: 1000, signatures: 0.2, pull: 0.55, cekirdek: 'Kurucu kadro',
+         factions: { yonetim: [0.48, 1], teskilat: [0.27, 6], degisimci: [0.15, 22], cekirdek: [0.1, 5] } },
   IYI: { delegates: 1100, signatures: 0.2, pull: 0.32, cekirdek: 'Milliyetçi çekirdek',
          factions: { yonetim: [0.4, 1.5], teskilat: [0.28, 9], degisimci: [0.18, 25], cekirdek: [0.14, 8] } },
   YSP: { delegates: 1000, signatures: 0.2, pull: 0.32, cekirdek: 'Hareket çekirdeği',

@@ -41,6 +41,7 @@ export const CLUSTERS = [
 // bölgedeki YSP oyuna göre dinamik eklenir (engine/model.js).
 export const PARTY_TO_CLUSTER = {
   AKP:   { muhafazakar: 0.75, milliyetci: 0.06, dindar: 0.06, kararsiz: 0.13 },
+  YENI:  { laik_kentli: 0.68, sol: 0.10, milliyetci: 0.04, kurt: 0.05, kararsiz: 0.13 },
   CHP:   { laik_kentli: 0.70, sol: 0.08, milliyetci: 0.05, kurt: 0.04, kararsiz: 0.13 },
   MHP:   { milliyetci: 0.80, muhafazakar: 0.10, kararsiz: 0.10 },
   IYI:   { milliyetci: 0.45, laik_kentli: 0.30, kararsiz: 0.25 },

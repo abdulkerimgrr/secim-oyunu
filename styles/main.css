@@ -631,3 +631,9 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
 .aset-row input { width: 22px; height: 22px; accent-color: var(--ink); }
 .aset-col { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: 14px; }
 .sc-social .cine-skip, .sc-foreign .cine-skip { top: 8px; bottom: auto; }
+.crisis { border: 2px solid var(--bad, #C62828); background: linear-gradient(180deg, #FFF4F2, var(--card, #fff)); }
+.crisis .li { padding: 6px 0; }
+.presetlooks { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.presetlook { flex-direction: column; align-items: center; text-align: center; gap: 4px; padding: 8px; cursor: pointer; }
+.presetlook svg { border-radius: 8px; }
+.photo-up { justify-content: center; }

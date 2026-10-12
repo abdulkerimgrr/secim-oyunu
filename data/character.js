@@ -5,8 +5,8 @@ export const LOOKS = {
   skin: ['#F6D7C3', '#EBC2A3', '#D9A47F', '#C08660', '#9C6644', '#6F4A33'],
   face: [['oval', 'Oval'], ['yuvarlak', 'Yuvarlak'], ['koseli', 'Köşeli']],
   hairStyle: {
-    e: [['kisa', 'Kısa'], ['yan', 'Yandan ayrık'], ['geriye', 'Geriye taranmış'], ['dalgali', 'Dalgalı'], ['seyrek', 'Seyrek'], ['kel', 'Kel']],
-    k: [['kisa', 'Kısa'], ['omuz', 'Omuz hizası'], ['topuz', 'Topuz'], ['uzun', 'Uzun'], ['dalgali', 'Dalgalı'], ['basortu', 'Başörtülü']],
+    e: [['kisa', 'Kısa'], ['yan', 'Yandan ayrık'], ['geriye', 'Geriye taranmış'], ['dalgali', 'Dalgalı'], ['kivircik', 'Kıvırcık'], ['seyrek', 'Seyrek'], ['kel', 'Kel']],
+    k: [['kisa', 'Kısa'], ['omuz', 'Omuz hizası'], ['topuz', 'Topuz'], ['uzun', 'Uzun'], ['dalgali', 'Dalgalı'], ['kivircik', 'Kıvırcık'], ['basortu', 'Başörtülü']],
   },
   hairColor: [['#1E1A18', 'Siyah'], ['#4A3226', 'Koyu kahve'], ['#7A5236', 'Kumral'], ['#B88A4E', 'Sarı'], ['#8E8E8E', 'Kır'], ['#D9D9D9', 'Beyaz']],
   facial: [['yok', 'Yok'], ['biyik', 'Bıyık'], ['sakal', 'Sakal'], ['kirli', 'Kirli sakal'], ['kepce', 'Kalın bıyık']],
@@ -18,8 +18,16 @@ export const LOOKS = {
   brows: [['ince', 'İnce'], ['normal', 'Normal'], ['kalin', 'Kalın'], ['catik', 'Çatık']],
   nose: [['kucuk', 'Küçük'], ['orta', 'Orta'], ['buyuk', 'Belirgin']],
   lips: [['ince', 'İnce'], ['orta', 'Orta'], ['dolgun', 'Dolgun']],
-  outfit: { e: [['takim', 'Takım + kravat'], ['acikyaka', 'Takım, açık yaka'], ['gomlek', 'Gömlek'], ['kazak', 'Kazak']], k: [['takim', 'Döpiyes'], ['bluz', 'Bluz'], ['kazak', 'Kazak']] },
+  outfit: { e: [['takim', 'Takım + kravat'], ['acikyaka', 'Takım, açık yaka'], ['gomlek', 'Gömlek'], ['kazak', 'Kazak'], ['kapusonlu', 'Kapüşonlu']], k: [['takim', 'Döpiyes'], ['bluz', 'Bluz'], ['kazak', 'Kazak'], ['kapusonlu', 'Kapüşonlu']] },
+  earring: [['yok', 'Yok'], ['var', 'Küpe']],
 };
+
+// Hazır görünümler (yalnızca dış görünüş; meslek ve kişilik korunur)
+export const PRESET_LOOKS = [
+  { id: 'gorsel', label: 'Kıvırcık saçlı, sakallı, kapüşonlu', look: {
+    gender: 'e', age: 30, skin: '#D9A47F', face: 'oval', hairStyle: 'kivircik', hairColor: '#4A3226', facial: 'sakal', glasses: 'yok',
+    suit: '#6B6F76', accent: '#E0E0E0', eyeColor: '#5B3A1E', brows: 'kalin', nose: 'orta', lips: 'orta', outfit: 'kapusonlu', earring: 'var', pin: false } },
+];
 
 export const PROFESSIONS = [
   { id: 'avukat', label: 'Avukat', desc: 'Skandal ve usulsüzlük riski azalır; kurultayda ilke vurgusu güçlü.' },

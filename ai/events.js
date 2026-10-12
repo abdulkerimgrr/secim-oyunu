@@ -9,6 +9,7 @@ import { PROVINCES } from '../data/generated/provinces.js';
 import { bumpAll, bumpFaction } from '../engine/kurultay.js';
 import { addClusterMom } from '../engine/social.js';
 import { CLUSTERS } from '../data/clusters.js';
+import { applyPresidencyEffect } from '../engine/presidency.js';
 
 function eligible(state, ev) {
   const w = ev.when || {};
@@ -76,6 +77,15 @@ export function describeOption(state, opt) {
   if (e.members) out.push('Yeni üyeler');
   if (e.ballotSecurity) out.push('Sandık güvenliği artar');
   if (e.intel) out.push('İl bazında detaylı anket');
+  if (e.presidency) {
+    const pe = e.presidency;
+    if (pe.approval) out.push(`Onay ${r(pe.approval, 1)}`);
+    if (pe.replace) out.push(`${pe.replace.length} bakan değişir`);
+    if (pe.econ?.target) out.push(pe.econ.target < 0 ? 'Enflasyon baskısı azalır' : 'Enflasyon baskısı artar');
+    if (pe.loyalty || pe.loyaltyAll) out.push('Kabine sadakati değişir');
+    if (pe.unity) out.push(`İç huzur ${pe.unity > 0 ? '+' : ''}${pe.unity}`);
+    if (pe.inquiry) out.push('Genel Kurul oylaması: 360 oyla soruşturma açılır');
+  }
   if (opt.ideologyHint) out.push(c >= 1 ? 'İdeolojinle tutarlı' : '⚠️ İdeolojinle çelişiyor (U dönüşü riski)');
   return out;
 }
@@ -96,6 +106,7 @@ export function resolveEvent(state, uid, optIndex, rng) {
   if (e.money) { const v = Math.round(R(e.money)); p.money += v; lines.push(`Para ${fmtMoney(v)}`); }
   if (e.image) { const v = R(e.image); p.leader.image = clamp(p.leader.image + v, 0, 1); lines.push(`İmaj ${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)}`); }
   if (e.cluster) { const v = R(e.cluster.power) * c; addClusterMom(state, p.id, e.cluster.aud, v); lines.push(`Hedef kitlede ivme ${v >= 0 ? '+' : ''}${v.toFixed(3).replace('.', ',')}`); }
+  if (e.presidency) lines.push(...applyPresidencyEffect(state, e.presidency, rng));
   if (e.policyStance) state.flags.policyStances = { ...(state.flags.policyStances || {}), [e.policyStance.id]: e.policyStance.stance };
   const k = state.player.kurultay;
   if (e.support && k && !state.player.isLeader) { const b = k.support; bumpAll(k, R(e.support)); lines.push(`Delege desteği ${k.support - b >= 0 ? '+' : ''}${(k.support - b).toFixed(1)}`); }

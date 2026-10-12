@@ -23,5 +23,5 @@ export const START_YEARS = [
   { id: '2015', label: '2015', available: false },
   { id: '2018', label: '2018', available: false },
   { id: '2023', label: '2023', available: true },
-  { id: 'bugun', label: 'Bugün', available: false },
+  { id: 'bugun', label: 'Bugün', available: true },
 ];

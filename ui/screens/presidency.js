@@ -38,6 +38,10 @@ export function renderPresidency(view, ctx) {
     <p class="small muted" style="text-align:center;margin:0">Eğilim: ${tgt > p.approval + 1 ? '▲ yükseliyor' : tgt < p.approval - 1 ? '▼ düşüyor' : '● sabit'} · Onay; ekonomi, dış ilişkiler, partinin anketi ve kabineye bağlıdır.</p>
     ${p.history.length > 1 ? pollTrend([{ id: 'ap', color: me.color, bold: true, values: p.history.map(h => h.approval / 100) }], p.history.map(h => h.date), { height: 120 }) : ''}
   </section>`);
+  // Bekleyen krizler (Gündem'de yanıtlanır)
+  const crises = s.events.active.filter(ev => ev.presidency);
+  if (crises.length) view.insertAdjacentHTML('beforeend', `<section class="card crisis"><h2>🚨 Kabine ve Meclis gündemi</h2>${crises.map(ev => `<div class="li"><div class="grow"><b>${esc(ev.title)}</b><div class="small muted">${esc(ev.body)}</div></div></div>`).join('')}
+    <button class="btn red block" style="margin-top:8px" data-go="gundem">Karar ver →</button></section>`);
   // Hızlı kararlar
   const acts = ['cbEconomy', 'cbLaw', 'cbWage', 'cbSummit', 'cbAddress'].map(actionById);
   view.insertAdjacentHTML('beforeend', `<section class="card"><h2>Kararlar <small>eylem puanı kullanır · kalan ${s.player.ap}</small></h2><div class="grid2">${acts.map(a => `<button class="select-card" data-cb="${a.id}" style="padding:10px;flex-direction:column;gap:2px"><span style="font-size:24px">${a.icon}</span><b class="small">${esc(a.label)}</b><span class="small muted">${a.ap} puan</span></button>`).join('')}</div></section>`);
@@ -62,6 +66,7 @@ export function renderPresidency(view, ctx) {
     <p class="small" style="margin:0">${seats >= 360 ? '✅ Anayasa değişikliği için 360 çoğunluğun var.' : seats >= 301 ? '✅ Kanunları geçirecek salt çoğunluğun var.' : '⚠️ Meclis\'te çoğunluğun yok; kanun teklifleri zor geçer.'}</p></section>`);
   if (p.laws.length) view.insertAdjacentHTML('beforeend', `<section class="card"><h2>Kanunlar ve kararlar</h2><div class="list">${p.laws.slice(0, 8).map(l => `<div class="li small"><span class="pill ${l.passed ? 'good' : 'bad'}">${l.passed ? 'Kabul' : 'Ret'}</span><div class="grow">${esc(policyById(l.id).title)}</div><span class="muted">${fmtDate(l.date)}</span></div>`).join('')}</div></section>`);
 
+  view.querySelectorAll('[data-go]').forEach(b => b.onclick = () => ctx.go(b.dataset.go));
   view.querySelectorAll('[data-cb]').forEach(b => b.onclick = () => openAction(ctx, actionById(b.dataset.cb), {}));
   view.querySelectorAll('[data-post]').forEach(b => b.onclick = () => {
     const post = CABINET_POSTS.find(x => x.id === b.dataset.post);
