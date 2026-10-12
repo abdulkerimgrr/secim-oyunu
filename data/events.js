@@ -1,0 +1,175 @@
+// Kural tabanlı olay havuzu. TÜM OLAYLAR KURGUSALDIR (oyun içi senaryo).
+// Gerçek kişilere alıntı/iddia atfedilmez; gerçek partiler yalnızca tarafsız bağlamda anılır.
+//
+// effects alanları ([min, max] aralığı, sonuç rastgele bu aralıkta):
+//  momentum: ulusal ivme (oy etkisi), recognition: tanınırlık (0–1), unity: parti içi huzur (0–100),
+//  money: TL, image: lider imajı (0–1), region: {name, value:[a,b]} bölgesel kampanya etkisi,
+//  support: kurultay delege desteği (katıl modu, kurultay öncesi), econMood: hükümete etki
+// when: koşullar — mode ('found'|'join'), leader (true: oyuncu genel başkan), minRec, maxRec,
+//  minMisery, maxPoll, minPoll, preKurultay (true), phase ('campaign')
+
+export const EVENT_POOL = [
+  { id: 'kurucu_kriz', weight: 3, when: { mode: 'found', maxRec: 0.4 },
+    title: 'Kurucular arasında yetki tartışması',
+    body: 'İki kurucu üye, il başkanı atamaları konusunda anlaşamıyor. Tartışma sosyal medyaya sızdı.',
+    options: [
+      { label: 'Kapalı kapılar ardında uzlaştır', effects: { unity: [4, 8], money: [-50000, -20000] } },
+      { label: 'Genel başkan olarak kesin karar ver', effects: { unity: [-6, 2], image: [0.0, 0.02] } },
+      { label: 'Görmezden gel', effects: { unity: [-10, -4] } },
+    ] },
+  { id: 'bagisci_sart', weight: 3, when: { leader: true },
+    title: 'Büyük bağışçıdan şartlı teklif',
+    body: 'Bir iş insanı yüklü bir bağış teklif ediyor; karşılığında kendi ilinde aday belirlemede söz istiyor.',
+    options: [
+      { label: 'Kabul et', effects: { money: [1500000, 3000000], unity: [-8, -3], scandalRisk: 0.25 } },
+      { label: 'Şartsız bağış iste', effects: { money: [0, 600000], image: [0.0, 0.01] } },
+      { label: 'Reddet ve açıkla', effects: { image: [0.01, 0.03], recognition: [0.002, 0.008] } },
+    ] },
+  { id: 'viral_video', weight: 2, when: { leader: true },
+    title: 'Bir pazar ziyaretin viral oldu',
+    body: 'Esnafla sohbetinin kısa bir videosu milyonlarca kez izlendi. Yorumlar ikiye bölünmüş durumda.',
+    options: [
+      { label: 'Dalgayı büyüt: dijital kampanya başlat', effects: { recognition: [0.01, 0.04], money: [-400000, -200000], momentum: [0.02, 0.08] } },
+      { label: 'Mütevazı bir teşekkür paylaş', effects: { recognition: [0.005, 0.02], image: [0.0, 0.02] } },
+    ] },
+  { id: 'eski_paylasim', weight: 2, when: { leader: true },
+    title: 'Eski bir paylaşımın yeniden gündemde',
+    body: 'Yıllar önceki bir sosyal medya paylaşımın bağlamından koparılarak dolaşıma sokuldu.',
+    options: [
+      { label: 'Özür dile', effects: { image: [-0.02, 0.01], unity: [-2, 1] } },
+      { label: 'Bağlamını anlatan açıklama yap', effects: { image: [-0.03, 0.02], recognition: [0.0, 0.01] } },
+      { label: 'Karşı saldırıya geç', effects: { image: [-0.05, 0.03], momentum: [-0.05, 0.05] } },
+    ] },
+  { id: 'asgari_ucret', weight: 3, when: {},
+    title: 'Asgari ücret tartışması alevlendi',
+    body: 'Yeni asgari ücret rakamı öncesi sendikalar ve işveren örgütleri karşı karşıya. Partilerden tutum bekleniyor.',
+    options: [
+      { label: 'Çalışanın yanında: yüksek artış savun', ideologyHint: { eko: -1 }, effects: { momentum: [0.01, 0.06] } },
+      { label: 'Dengeli artış ve vergi indirimi öner', ideologyHint: { eko: 0 }, effects: { momentum: [0.0, 0.04], image: [0.0, 0.01] } },
+      { label: 'İşvereni koru: istihdam vurgusu', ideologyHint: { eko: 1 }, effects: { momentum: [-0.02, 0.03] } },
+    ] },
+  { id: 'gocmen', weight: 3, when: {},
+    title: 'Düzensiz göç yeniden gündemin ilk sırasında',
+    body: 'Bir sınır ilinde yaşanan gerginlik sonrası göç politikası tartışılıyor.',
+    options: [
+      { label: 'Sıkı sınır ve geri dönüş planı', ideologyHint: { milli: 1 }, effects: { momentum: [0.0, 0.06] } },
+      { label: 'İnsani ve düzenli göç politikası', ideologyHint: { milli: -1 }, effects: { momentum: [-0.03, 0.04] } },
+      { label: 'Yorum yapma', effects: { recognition: [-0.005, 0] } },
+    ] },
+  { id: 'deprem_yardim', weight: 2, when: {},
+    title: 'Deprem bölgesinde barınma sorunu sürüyor',
+    body: 'Konteyner kentlerde yaşayanlar kalıcı konut teslim takvimini soruyor.',
+    options: [
+      { label: 'Bölgeye yardım tırı ve gönüllü ekip gönder', effects: { money: [-600000, -300000], region: { name: 'Güneydoğu Anadolu', value: [0.05, 0.15] }, image: [0.01, 0.02] } },
+      { label: 'Meclise araştırma önergesi çağrısı', effects: { recognition: [0.002, 0.01] } },
+    ] },
+  { id: 'kur_soku', weight: 2, when: { minMisery: 0 }, world: true,
+    title: 'Döviz kurunda sert hareket',
+    body: 'Piyasalarda dalgalanma sonrası TL değer kaybetti. Gözler Merkez Bankası\'nda.',
+    econShock: { usdTry: [0.03, 0.08], inflation: [0.5, 2.0] },
+    options: [
+      { label: 'Hükümeti sert eleştir', effects: { momentum: [0.0, 0.05] }, oppositionOnly: true },
+      { label: 'Sakin ol çağrısı ve somut ekonomi programı açıkla', effects: { image: [0.0, 0.02], momentum: [0.0, 0.03] } },
+    ] },
+  { id: 'emekli', weight: 2, when: {},
+    title: 'Emekli maaşları tartışması',
+    body: 'En düşük emekli aylığına yapılacak düzenleme Meclis gündeminde.',
+    options: [
+      { label: 'Emekliler için miting çağrısı', effects: { momentum: [0.01, 0.05], money: [-200000, -100000] } },
+      { label: 'Kanun teklifi taslağı hazırla', effects: { recognition: [0.003, 0.01], image: [0.0, 0.01] } },
+    ] },
+  { id: 'transfer_teklifi', weight: 2, when: { leader: true, minPoll: 0.02 },
+    title: 'Başka partiden bir il başkanı katılmak istiyor',
+    body: 'Rakip bir partinin deneyimli bir il başkanı ekibiyle birlikte partine geçmek istediğini iletti.',
+    options: [
+      { label: 'Kabul et, ili ona emanet et', effects: { orgBoost: [0.15, 0.3], unity: [-5, 0] } },
+      { label: 'Kabul et ama yetki verme', effects: { orgBoost: [0.05, 0.12], unity: [-2, 1] } },
+      { label: 'Nazikçe reddet', effects: { unity: [1, 3] } },
+    ] },
+  { id: 'teskilat_yolsuzluk', weight: 2, when: { leader: true },
+    title: 'İl teşkilatında usulsüzlük iddiası',
+    body: 'Bir il başkanlığının bağış kayıtlarında açıklanamayan eksik olduğu iddia edildi.',
+    options: [
+      { label: 'Görevden al, denetim başlat', effects: { unity: [-4, 0], image: [0.01, 0.03] } },
+      { label: 'İç soruşturma, kamuoyuna açıklama yapma', effects: { scandalRisk: 0.3 } },
+    ] },
+  { id: 'ogrenci_barinma', weight: 2, when: {},
+    title: 'Üniversite öğrencilerinin barınma sorunu',
+    body: 'Büyük şehirlerde kira artışları öğrencileri zor durumda bıraktı; parklarda nöbet tutan gruplar var.',
+    options: [
+      { label: 'Öğrencileri ziyaret et', effects: { momentum: [0.01, 0.05], recognition: [0.003, 0.01] } },
+      { label: 'Yurt yapımı için somut proje açıkla', effects: { image: [0.0, 0.02] } },
+    ] },
+  { id: 'ciftci', weight: 2, when: {},
+    title: 'Çiftçi mazot ve gübre fiyatlarına tepkili',
+    body: 'Hasat öncesi girdi maliyetleri yükseldi; üretici birlikleri destek istiyor.',
+    options: [
+      { label: 'Tarla ziyaretleri programı', effects: { region: { name: 'İç Anadolu', value: [0.04, 0.12] }, money: [-150000, -80000] } },
+      { label: 'Tarım destek paketi öner', effects: { momentum: [0.0, 0.04] } },
+    ] },
+  { id: 'tv_davet', weight: 3, when: { leader: true, maxRec: 0.7 },
+    title: 'Ana haber bülteninden canlı yayın daveti',
+    body: 'Yüksek izlenen bir haber kanalı seni ana haber bülteninde konuk etmek istiyor. Sorular sert olabilir.',
+    options: [
+      { label: 'Kabul et', effects: { recognition: [0.02, 0.05], image: [-0.03, 0.04] } },
+      { label: 'Hazırlık için bir hafta ertele', effects: { recognition: [0.005, 0.015] } },
+      { label: 'Reddet', effects: {} },
+    ] },
+  { id: 'anket_sirketi', weight: 1, when: { leader: true },
+    title: 'Anket şirketi özel araştırma öneriyor',
+    body: 'Bir araştırma şirketi, partine il bazında detaylı anket teklif ediyor.',
+    options: [
+      { label: 'Satın al (₺350.000)', effects: { money: [-350000, -350000], intel: 1 } },
+      { label: 'Gerek yok', effects: {} },
+    ] },
+  { id: 'kurultay_imza', weight: 3, when: { preKurultay: true },
+    title: 'Delegeler imza kampanyası istiyor',
+    body: 'Bir grup delege, olağanüstü kurultay için imza toplamaya hazır olduklarını söylüyor; karşılığında yönetimde temsil istiyorlar.',
+    options: [
+      { label: 'Söz ver', effects: { support: [3, 7], unity: [-3, 0] } },
+      { label: 'Programı anlatmakla yetin', effects: { support: [0, 3] } },
+    ] },
+  { id: 'kurultay_basin', weight: 2, when: { preKurultay: true },
+    title: 'Genel merkezden sert tepki',
+    body: 'Mevcut yönetim, adaylık çalışmalarını "parti içi huzuru bozmak" olarak niteledi.',
+    options: [
+      { label: 'Yumuşak cevap: "Değişim herkesin hakkı"', effects: { support: [1, 4] } },
+      { label: 'Sert cevap ver', effects: { support: [-3, 6], unity: [-6, -2] } },
+    ] },
+  { id: 'gonullu_sandik', weight: 2, when: { leader: true, phase: 'campaign' },
+    title: 'Sandık gönüllüsü başvuruları',
+    body: 'Seçim güvenliği için gönüllü başvuruları beklentinin üzerinde. Eğitim için kaynak gerekiyor.',
+    options: [
+      { label: 'Eğitim programı başlat (₺500.000)', effects: { money: [-500000, -500000], ballotSecurity: [0.1, 0.2] } },
+      { label: 'Mevcut kaynakla idare et', effects: { ballotSecurity: [0.02, 0.05] } },
+    ] },
+  { id: 'enflasyon_verisi', weight: 2, when: { minMisery: 5 },
+    title: 'Enflasyon beklentilerin üzerinde',
+    body: 'Açıklanan aylık enflasyon verisi beklentilerin üzerinde geldi; mutfak masrafları en çok konuşulan konu.',
+    options: [
+      { label: 'Pazar yerinde fiyat incelemesi yap', effects: { momentum: [0.01, 0.05] } },
+      { label: 'Ekonomi ekibinle çözüm programı açıkla', effects: { image: [0.0, 0.02], momentum: [0.0, 0.03] } },
+    ] },
+  { id: 'sendika', weight: 2, when: { leader: true },
+    title: 'Bir sendika konfederasyonu görüşme istiyor',
+    body: 'Sendika yöneticileri çalışma hayatı taleplerini anlatmak için randevu istiyor.',
+    options: [
+      { label: 'Görüş ve taleplerini sahiplen', ideologyHint: { eko: -1 }, effects: { momentum: [0.0, 0.04], members: [200, 800] } },
+      { label: 'Görüş ama söz verme', effects: { image: [0.0, 0.01] } },
+    ] },
+  { id: 'sel_felaketi', weight: 1, when: {}, world: true,
+    title: 'Karadeniz\'de sel felaketi',
+    body: 'Şiddetli yağışlar sonrası birçok ilçede su baskını yaşandı.',
+    options: [
+      { label: 'Bölgeye git, yardım koordine et', effects: { region: { name: 'Karadeniz', value: [0.04, 0.12] }, money: [-250000, -100000] } },
+      { label: 'Geçmiş olsun mesajı yayınla', effects: {} },
+    ] },
+];
+
+// Haber akışı için şablonlar (rakip hamleleri)
+export const NEWS_TEMPLATES = {
+  rally: ['{party}, {prov} mitinginde ekonomiye vurgu yaptı', '{party} {provLoc} meydanı doldurdu', '{party} lideri {provLoc} vatandaşlarla buluştu'],
+  tv: ['{party} lideri canlı yayında gündemi değerlendirdi', '{party}: "Önceliğimiz hayat pahalılığı"'],
+  attackGov: ['{party} hükümetin ekonomi politikasını eleştirdi'],
+  attackPlayer: ['{party} çevrelerinden yeni hareket {target} hakkında eleştiri', '{party}, {target} cephesinin ekonomi önerilerini hedef aldı'],
+};
