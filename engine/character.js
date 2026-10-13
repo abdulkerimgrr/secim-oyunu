@@ -25,3 +25,16 @@ export function charMod(state, key) {
 }
 
 export function isHometown(state, plate) { return state.player?.character?.hometown === +plate; }
+
+// Karakter ekranındaki özet göstergeler (0–100). Yukarıdaki oyun etkilerinin okunur özeti.
+export function charStats(c) {
+  const t = new Set(c.traits || []), p = c.profession, ed = { lise: 0, lisans: 2, yl: 5, doktora: 8 }[c.education] || 0;
+  const v = (x) => Math.max(10, Math.min(99, Math.round(x)));
+  return [
+    { id: 'karizma', label: 'Karizma', icon: '💬', v: v(52 + (t.has('hatip') ? 15 : 0) + (t.has('medyatik') ? 12 : 0) + (t.has('halkci') ? 6 : 0) + (p === 'doktor' ? 8 : 0) + (p === 'akademisyen' ? 3 : 0)) },
+    { id: 'strateji', label: 'Strateji', icon: '⚙️', v: v(50 + (t.has('muzakereci') ? 15 : 0) + (t.has('teknokrat') ? 10 : 0) + (p === 'ekonomist' ? 10 : 0) + (p === 'avukat' ? 5 : 0) + ed) },
+    { id: 'guven', label: 'Güven', icon: '🤝', v: v(52 + (t.has('sogukkanli') ? 12 : 0) + (t.has('halkci') ? 8 : 0) + (p === 'doktor' ? 10 : 0) + (p === 'ogretmen' ? 8 : 0) + (p === 'avukat' ? 6 : 0) - (t.has('sert') ? 10 : 0) + ((c.age || 45) >= 50 ? 5 : 0)) },
+    { id: 'tartisma', label: 'Tartışma', icon: '🎙️', v: v(50 + (p === 'gazeteci' ? 12 : 0) + (p === 'avukat' ? 10 : 0) + (t.has('sert') ? 8 : 0) + (t.has('hatip') ? 8 : 0) + (t.has('sogukkanli') ? 6 : 0) + (p === 'akademisyen' ? 5 : 0)) },
+    { id: 'saha', label: 'Saha', icon: '🚩', v: v(48 + (t.has('calistay') ? 12 : 0) + (p === 'sendikaci' ? 14 : 0) + (t.has('halkci') ? 10 : 0) + (p === 'ogretmen' ? 6 : 0) + (p === 'isinsani' ? 4 : 0)) },
+  ];
+}

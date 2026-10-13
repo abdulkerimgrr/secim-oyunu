@@ -61,7 +61,7 @@ const NOSE = {
   buyuk: 'M60.5 58 Q55.5 68 57.5 71.5 Q60.5 73 63.5 71',
 };
 
-export function avatarSvg(c, { size = 120, bg = '#E6EBF3', ring = null, mood = 'smile', pin } = {}) {
+export function avatarSvg(c, { size = 120, bg = '#E6EBF3', ring = null, mood = 'smile', pin, crop = null } = {}) {
   const id = 'av' + (++uid);
   // Oyuncunun yüklediği fotoğraf (yalnızca bu tarayıcıda, kayıt içinde saklanır)
   if (c.photo && /^data:image\/(jpeg|png|webp);base64,/.test(c.photo)) {
@@ -171,5 +171,6 @@ export function avatarSvg(c, { size = 120, bg = '#E6EBF3', ring = null, mood = '
     g += `<g fill="none" stroke="${col}" stroke-width="${w}"><rect x="43" y="52" width="15" height="11" rx="4"/><rect x="62" y="52" width="15" height="11" rx="4"/><path d="M58 57 Q60 55.5 62 57 M43 56 L37 55 M77 56 L83 55"/></g>
       <path d="M45 54 L49 53 M64 54 L68 53" stroke="#FFFFFF" stroke-width="1.2" opacity=".55"/>`;
   }
-  return `<svg viewBox="0 0 120 140" width="${size}" height="${Math.round(size * 140 / 120)}" role="img" aria-label="Karakter portresi" style="display:block">${g}</svg>`;
+  const vb = crop || [0, 0, 120, 140];
+  return `<svg viewBox="${vb.join(' ')}" width="${size}" height="${Math.round(size * vb[3] / vb[2])}" role="img" aria-label="Karakter portresi" style="display:block">${g}</svg>`;
 }
