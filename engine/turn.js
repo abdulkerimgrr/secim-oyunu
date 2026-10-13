@@ -16,6 +16,8 @@ import { socialTick } from './social.js';
 import { govTick, ensureGovState } from './government.js';
 import { weeklyStaffCost, staffMod } from './staff.js';
 import { presidencyTick } from './presidency.js';
+import { metricsTick, infraWeeklyCost, ensureMetrics } from './metrics.js';
+import { crisisTick } from './crisis.js';
 
 export function withRng(state, fn) {
   const rng = createRng(state.seed);
@@ -64,6 +66,7 @@ export function weeklyBudget(state) {
     teskilat: big ? 0 : orgCost,
     personel: (big ? 200000 : 15000 + 4000 * (p.founders?.length || 0)) * infl,
     ekip: weeklyStaffCost(state),
+    altyapi: state.player.isLeader ? infraWeeklyCost(state) : 0,
   };
   return { income, expense, net: Object.values(income).reduce((a, b) => a + b, 0) - Object.values(expense).reduce((a, b) => a + b, 0) };
 }
@@ -121,8 +124,10 @@ export function endTurn(state) {
     const days = state.phase === 'campaign' ? 1 : 7;
     const f = days / 7;
     ensureGovState(state);
+    ensureMetrics(state);
     rivalsAct(state, rng, f);
     socialTick(state, rng, f);
+    metricsTick(state, rng, f);
     economyStep(state, rng, days);
     govTick(state, rng, f, { playerGoverns: !!state.player.isPresident });
     presidencyTick(state, rng, f);
@@ -164,6 +169,7 @@ export function endTurn(state) {
 
     // Olaylar
     maybeTriggerEvent(state, rng, state.phase === 'campaign' ? 0.2 : 0.45);
+    crisisTick(state, rng);
     if (state.intel > 0) state.intel -= f;
     if (staffMod(state, 'intel')) state.intel = Math.max(state.intel || 0, 1);
 

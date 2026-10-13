@@ -6,6 +6,7 @@ import { clamp, addDays } from './util.js';
 import { charMod } from './character.js';
 import { addNews } from './news.js';
 import { staffMod } from './staff.js';
+import { addDirty } from './metrics.js';
 
 export const campaignDef = id => SOCIAL_CAMPAIGNS.find(c => c.id === id);
 
@@ -35,6 +36,7 @@ export function launchCampaign(state, def, prm, rng, fatigueMul = 1) {
   if (def.shield) state.flags.shieldUntil = addDays(state.date, def.weeks * 7);
   if (def.momentum) p.momentum += def.momentum * mult;
   if (def.image && !backfire) p.leader.image = clamp(p.leader.image + def.image * mult, 0, 1);
+  if (def.dirty) addDirty(state, { id: 'social-' + def.id, ...def.dirty });
   state.socialCampaigns = state.socialCampaigns || [];
   if (c.weeksLeft > 0) state.socialCampaigns.push(c);
   else archive(state, c);
@@ -53,6 +55,11 @@ export function campaignWeek(state, c, f, rng) {
   const p = state.parties[state.player.partyId];
   const share = f / def.weeks;
   addClusterMom(state, p.id, def.audience, def.power * c.mult * share);
+  if (def.rivalHit) {
+    const poll = state.polls.length ? state.polls[state.polls.length - 1].shares : {};
+    const top = Object.values(state.parties).filter(x => x.id !== p.id && !x.aggregate).sort((a, b) => (poll[b.id] || 0) - (poll[a.id] || 0))[0];
+    if (top) top.momentum -= def.rivalHit * share;
+  }
   p.recognition = clamp(p.recognition + def.rec * c.mult * share * (1 - p.recognition), 0, 1);
   if (def.local && c.province) {
     const cc = state.camp[c.province] || (state.camp[c.province] = {});

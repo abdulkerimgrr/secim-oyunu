@@ -1,4 +1,5 @@
 // Milletvekili genel seçimi: baraj, ittifak kuralı, seçim bölgesi bazında D'Hondt.
+import { mobilizer } from './metrics.js';
 import { dhondt } from './dhondt.js';
 import { project, allianceShare } from './model.js';
 import { K, DIFFICULTY } from './params.js';
@@ -53,7 +54,7 @@ export function electionNoise(state, rng) {
 export function runGeneralElection(state, rng) {
   const noise = electionNoise(state, rng);
   state.turnoutShift = rng.normal(0, 0.015);
-  const pr = project(state, { ballotOnly: true, noise });
+  const pr = project(state, { ballotOnly: true, noise, mobilize: mobilizer(state) });
   const { seats, pass, unitSeats } = computeSeats(state, pr);
   const prev = state.parliament.seats;
   const result = {
@@ -97,7 +98,7 @@ export function runGeneralElection(state, rng) {
 // Tam yerel seçim (ilçe, belde, meclis) Aşama 6'da.
 export function runLocalElection(state, rng) {
   const noise = electionNoise(state, rng);
-  const pr = project(state, { ballotOnly: true, noise });
+  const pr = project(state, { ballotOnly: true, noise, mobilize: mobilizer(state) });
   const mayors = {};
   for (const [pl, v] of Object.entries(pr.provinces)) {
     // yerelde aday etkisi: her partiye ek il bazlı gürültü

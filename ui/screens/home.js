@@ -12,6 +12,7 @@ import { CLUSTERS } from '../../data/clusters.js';
 import { openAction } from './campaign.js';
 import { avatarSvg } from '../avatar.js';
 import { PROFESSIONS } from '../../data/character.js';
+import { metricsMini } from './partyMetrics.js';
 
 const LAYERS = [
   ['first', 'Birinci parti'], ['me', 'Benim oyum'], ['alliance', 'İttifak'], ['turnout', 'Katılım'],
@@ -148,6 +149,7 @@ function statusCard(s) {
       <div class="stat"><div class="v" style="color:${poll >= s.rules.parliament.threshold ? 'var(--good)' : 'var(--ink)'}">${pct(poll)}</div><div class="l">Anket</div></div>
       <div class="stat"><div class="v">${pct(me.recognition, 0)}</div><div class="l">Tanınırlık</div></div>
       <div class="stat"><div class="v">${Math.round(me.unity)}</div><div class="l">İç huzur</div></div></div>
+    ${s.player.isLeader ? `<button class="mini-link" data-go="parti">${metricsMini(s)}</button>` : ''}
     ${el ? `<div class="row small" style="margin-top:8px"><span class="pill ${el.orgsOk ? 'good' : 'warn'}">İl teşkilatı ${el.orgs}/${el.needOrgs}</span><span class="pill ${el.congressOk ? 'good' : el.congressPossible ? 'warn' : 'bad'}">Büyük kongre ${el.congressOk ? 'tamam' : el.congressPossible ? 'yapılmadı' : 'süre geçti'}</span>${me.seats ? `<span class="pill good">${me.seats} milletvekili</span>` : ''}</div>` : ''}
   </section>`;
 }

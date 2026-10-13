@@ -1,5 +1,5 @@
 // Gündem: bekleyen olaylar (manşet kartları), haber akışı, geçmiş kararlar.
-import { esc, sheet } from '../dom.js';
+import { esc, sheet, toast } from '../dom.js';
 import { describeOption, resolveEvent } from '../../ai/events.js';
 import { withRng } from '../../engine/turn.js';
 import { saveGame } from '../../engine/save.js';
@@ -47,12 +47,13 @@ export function renderAgenda(view, ctx) {
     const card = document.createElement('article');
     card.className = 'headline';
     card.innerHTML = `<div class="flag"><span>SON DAKİKA</span><span>${fmtDate(ev.date)}</span></div><div class="body">
-      <h3>${esc(ev.title)}</h3><p>${esc(ev.body)}</p>
+      <h3>${esc(ev.title)}</h3>${ev.crisis ? `<div class="crisis-timer ${ev.crisis.escalated ? 'hot' : ''}">⏱ ${ev.crisis.escalated ? 'Son şans: bu tur yanıt vermezsen kriz kapanır ve ağır güven kaybı yaşarsın.' : 'Bu tur içinde yanıt ver; yoksa kriz büyür.'}${s.player.ap ? ` · kalan eylem puanı ${s.player.ap}` : ''}</div>` : ''}<p>${esc(ev.body)}</p>
       <div class="eyebrow">Tutumun ne olacak?</div>
       ${ev.options.filter(o => !(o.oppositionOnly && !isOpp)).map(o => `<button class="opt" data-opt="${o.i}"><div class="ol">${esc(o.label)}${advise(s, ev) === o.i ? ' <span class="pill good">🗂️ asistan önerisi</span>' : ''}</div><div class="oe">${esc(describeOption(s, o).join(' · ') || 'Belirgin etkisi yok')}</div></button>`).join('')}
       <p class="small muted" style="margin:8px 0 0;font-family:var(--f-body)">Kurgusal senaryo · kaynak: ${ev.source === 'havuz' ? 'kural tabanlı olay havuzu' : esc(ev.source)}</p></div>`;
     card.querySelectorAll('[data-opt]').forEach(b => b.onclick = () => {
       const r = withRng(s, rng => resolveEvent(s, ev.uid, +b.dataset.opt, rng));
+      if (!r || r.error) return toast(r?.error || 'Seçenek uygulanamadı.');
       storeProjection(s); saveGame(s, 'oto'); ctx.render();
       sheet(`<div class="eyebrow">${esc(r.title)}</div><h2>${esc(r.choice)}</h2><ul style="margin:0;padding-left:18px">${r.lines.map(l => `<li>${esc(l)}</li>`).join('') || '<li>Kayda değer bir etki olmadı.</li>'}</ul>`);
     });

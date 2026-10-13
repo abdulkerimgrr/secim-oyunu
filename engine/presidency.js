@@ -46,7 +46,8 @@ export function approvalTarget(state) {
   const poll = state.polls.length ? state.polls[state.polls.length - 1].shares[me.id] || 0 : me.lastShare;
   const p = ensurePresidency(state);
   const cab = Object.values(p.cabinet).reduce((a, m) => a + m.pop + m.comp * 0.5, 0) / CABINET_POSTS.length;
-  return clamp(48 + 70 * (poll - 0.33) - 0.6 * (misery(state.economy) - state.economy.misery0) + 0.35 * (foreignScore(state) - 50) + 40 * me.momentum + 10 * (cab - 0.75), 8, 92);
+  const stale = (state.player.promises || []).filter(x => !x.fulfilled && p.since && addDays(p.since, 365) < state.date).length; // bir yıldır bekleyen vaatler
+  return clamp(48 - 1.5 * stale + 70 * (poll - 0.33) - 0.6 * (misery(state.economy) - state.economy.misery0) + 0.35 * (foreignScore(state) - 50) + 40 * me.momentum + 10 * (cab - 0.75), 8, 92);
 }
 
 export function presidencyTick(state, rng, f) {

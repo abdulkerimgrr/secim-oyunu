@@ -43,7 +43,7 @@ export function renderPresidency(view, ctx) {
   if (crises.length) view.insertAdjacentHTML('beforeend', `<section class="card crisis"><h2>🚨 Kabine ve Meclis gündemi</h2>${crises.map(ev => `<div class="li"><div class="grow"><b>${esc(ev.title)}</b><div class="small muted">${esc(ev.body)}</div></div></div>`).join('')}
     <button class="btn red block" style="margin-top:8px" data-go="gundem">Karar ver →</button></section>`);
   // Hızlı kararlar
-  const acts = ['cbEconomy', 'cbLaw', 'cbWage', 'cbSummit', 'cbAddress'].map(actionById);
+  const acts = ['cbEconomy', 'cbLaw', 'cbWage', 'cbSummit', 'cbAddress', ...((s.player.promises || []).some(x => !x.fulfilled) ? ['cbPromise'] : [])].map(actionById);
   view.insertAdjacentHTML('beforeend', `<section class="card"><h2>Kararlar <small>eylem puanı kullanır · kalan ${s.player.ap}</small></h2><div class="grid2">${acts.map(a => `<button class="select-card" data-cb="${a.id}" style="padding:10px;flex-direction:column;gap:2px"><span style="font-size:24px">${a.icon}</span><b class="small">${esc(a.label)}</b><span class="small muted">${a.ap} puan</span></button>`).join('')}</div></section>`);
   // Kabine
   view.insertAdjacentHTML('beforeend', `<section class="card"><h2>Kabine</h2><div class="list">${CABINET_POSTS.map(post => { const m = p.cabinet[post.id]; return `<div class="li"><span style="font-size:22px;width:28px;text-align:center">${post.icon}</span>

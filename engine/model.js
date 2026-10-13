@@ -59,14 +59,21 @@ function precompute(state, parties) {
     return {
       p,
       base: K.recog * Math.log(Math.max(0.003, p.recognition)) + K.image * imageDelta
-            - K.ideologyShift * shift * shift * 4,
+            - K.ideologyShift * shift * shift * 4
+            + (p.trust !== undefined ? 0.12 * (p.trust - 50) / 50 : 0), // güven (yalnızca oyuncu partisinde tanımlı)
       mom: p.momentum,
       econ: (p.govWeight || 0) * Math.max(-20, Math.min(30, m)) * K.econ,
       tactical,
-      cmom: state.clusterMom?.[p.id] || null,
+      cmom: sumArr(state.clusterMom?.[p.id], state.promiseMom?.[p.id]),
       dist: CLUSTERS.map(c => ideologyDistance(c.ideo, p.ideology)),
     };
   });
+}
+
+function sumArr(a, b) {
+  if (!a) return b || null;
+  if (!b) return a;
+  return a.map((v, i) => v + (b[i] || 0));
 }
 
 export function allianceShare(state, shares, allianceId) {
@@ -84,7 +91,8 @@ export function electionProximity(state) {
 }
 
 // Tüm seçim bölgeleri için oy payı. noise: {nat:{k}, reg:{region:{k}}, unit(u,k)} (seçim günü)
-export function project(state, { ballotOnly = false, noise = null } = {}) {
+// mobilize: seçim günü sandığa taşıma farkı (teşkilat, seçim altyapısı, moral) — engine/metrics.js
+export function project(state, { ballotOnly = false, noise = null, mobilize = null } = {}) {
   const parties = activeParties(state, { ballotOnly });
   const pre = precompute(state, parties);
   const nC = CLUSTERS.length, nP = parties.length;
@@ -92,8 +100,11 @@ export function project(state, { ballotOnly = false, noise = null } = {}) {
   const natVotes = Object.fromEntries(parties.map(p => [p.id, 0]));
   let natTotal = 0;
   const util = new Float64Array(nP);
+  const clVotes = CLUSTERS.map(() => new Float64Array(nP));
   for (let ui = 0; ui < state.units.length; ui++) {
     const u = state.units[ui];
+    const turnout = Math.min(0.97, Math.max(0.4, u.turnout0 * (1 + (state.turnoutShift || 0))));
+    const valid = u.registered * turnout * u.validRatio;
     const camp = state.camp[u.plate] || {};
     const shares = new Float64Array(nP);
     const unitBase = new Float64Array(nP);
@@ -116,10 +127,13 @@ export function project(state, { ballotOnly = false, noise = null } = {}) {
       }
       let s = 0;
       for (let j = 0; j < nP; j++) { util[j] = Math.exp(util[j] - mx); s += util[j]; }
-      for (let j = 0; j < nP; j++) shares[j] += w * util[j] / s;
+      for (let j = 0; j < nP; j++) { shares[j] += w * util[j] / s; clVotes[c][j] += w * valid * util[j] / s; }
     }
-    const turnout = Math.min(0.97, Math.max(0.4, u.turnout0 * (1 + (state.turnoutShift || 0))));
-    const valid = u.registered * turnout * u.validRatio;
+    if (mobilize) {
+      let t = 0;
+      for (let j = 0; j < nP; j++) { shares[j] *= mobilize(parties[j], u.plate); t += shares[j]; }
+      for (let j = 0; j < nP; j++) shares[j] /= t;
+    }
     const rec = { id: u.id, plate: u.plate, seats: u.seats, turnout, valid, shares: {}, votes: {} };
     for (let j = 0; j < nP; j++) {
       const id = parties[j].id;
@@ -134,6 +148,11 @@ export function project(state, { ballotOnly = false, noise = null } = {}) {
     for (const id in rec.votes) pv.votes[id] = (pv.votes[id] || 0) + rec.votes[id];
   }
   for (const id in natVotes) out.national[id] = natVotes[id] / natTotal;
+  // Küme bazında ulusal paylar (seçmen grubu desteği için)
+  out.clusters = clVotes.map(arr => {
+    const t = arr.reduce((a, b) => a + b, 0) || 1;
+    return Object.fromEntries(parties.map((p, j) => [p.id, arr[j] / t]));
+  });
   for (const pl in out.provinces) {
     const pv = out.provinces[pl];
     pv.shares = {};

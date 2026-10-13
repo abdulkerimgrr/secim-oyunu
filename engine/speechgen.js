@@ -4,9 +4,9 @@ import { PROVINCE_BY_PLATE } from './state.js';
 import { policyById } from './government.js';
 import { gen, dat, loc } from './util.js';
 
-const DEPREM = [46, 31, 2, 44, 27, 80, 79, 21, 63, 1, 23];
+export const DEPREM = [46, 31, 2, 44, 27, 80, 79, 21, 63, 1, 23];
 const TURIZM = [7, 48, 9, 35, 17];
-const SANAYI = [41, 16, 34, 59, 26, 38, 42, 45, 20, 54];
+export const SANAYI = [41, 16, 34, 59, 26, 38, 42, 45, 20, 54];
 const TARIM = [42, 3, 70, 51, 40, 66, 58, 19, 60, 68, 71, 10, 45, 1, 63];
 const FINDIK = [52, 28, 53, 61, 81, 14];
 const MADEN = [67, 74, 78, 45, 43];

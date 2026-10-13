@@ -66,3 +66,11 @@ Parti ideoloji konumları, seçmen kümeleri ve bunların payları (2023 oyları
 
 ## Cumhurbaşkanlığı krizleri
 Bakan istifaları, skandallar ve kabine krizleri kurgusal senaryolardır. Meclis denetimi Anayasa m.106'ya göre modellenir: gensoru 2017'de kaldırıldı; Meclis soruşturması önergesi üye tamsayısının salt çoğunluğuyla (301) verilir, soruşturma açılması için 3/5 (360) oy gerekir (kaynaklı, sadeleştirilmiş).
+
+## Genişletilmiş kampanya (tasarım varsayımları)
+- **Göstergeler** (`engine/metrics.js`): güven, medya görünürlüğü, teşkilat morali ve rakip saldırı riski oyun tasarımıdır. Güven oya doğrudan küçük bir etki yapar (±0,12 fayda birimi); kazanımlar azalan getirilidir.
+- **Seçmen grupları** (`data/segments.js`): gençler, kadınlar, emekliler, işçiler, esnaf, kırsal, eğitimli kentliler, milliyetçi-muhafazakârlar. İdeolojik seçmen kümelerinin ağırlıklı birleşimidir; ağırlıklar **tasarım**, gerçek araştırmaya dayanmaz.
+- **Vaatler** (`data/campaign2.js`): yıllık bütçe yükleri (₺ milyar) ve ₺900 milyarlık "inandırıcı sınır" **oyun varsayımıdır**; gerçek bir bütçe hesabı değildir.
+- **Sandığa taşıma**: seçim günü partilerin oyları il teşkilatı gücü (±%5), oyuncu için ayrıca seçim altyapısı ve moral ile çarpılır. Anketler bu farkı içermez. Katsayılar **tasarım**.
+- **Krizler ve zincirleme olaylar** (`data/crises.js`): tümü kurgusal oyun içi senaryodur; gerçek kişiler hakkında iddia içermez.
+- **Etik dışı seçenekler** (bot ağı, dezenformasyon, etiketsiz influencer reklamı, bilgi sızdırma, sahte video teklifi): oyuncunun kendi riskli tercihi olarak modellenir; sonuç metinleri soyuttur, gerçek parti veya kişiler hakkında uydurma içerik üretilmez. Yakalanma olasılıkları tasarımdır.

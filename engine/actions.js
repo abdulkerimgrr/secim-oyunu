@@ -24,6 +24,9 @@ import { DESTINATIONS } from '../data/diplomacy.js';
 import { enactLaw, setMinimumWage, summit, addressNation, ensurePresidency, lawOptions } from './presidency.js';
 import { policyById, publicSupport } from './government.js';
 import { SIGNATURES_NEEDED } from './presidential.js';
+import { EXTRA_ACTIONS } from './actions2.js';
+import { applyFx, fxPreview, ensureMetrics, actionBoost } from './metrics.js';
+import { schedule } from './crisis.js';
 
 const DELEGATE_WEIGHTS = { teskilat: 1.5, yonetim: 0.25, degisimci: 0.8, cekirdek: 0.7 };
 const fmtSigned = v => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(1).replace('.', ',')}`;
@@ -44,7 +47,7 @@ export function skill(state, s) {
   return fs.length ? Math.max(...fs.map(f => f.level)) : 0;
 }
 
-function diff(state) { return DIFFICULTY[state.difficulty] || DIFFICULTY.zor; }
+export function diff(state) { return DIFFICULTY[state.difficulty] || DIFFICULTY.zor; }
 
 // Tekrar cezası: aynı eylem türü ve aynı il arka arkaya kullanıldıkça etki düşer
 export function fatigue(state, type, plate) {
@@ -52,7 +55,7 @@ export function fatigue(state, type, plate) {
   const p = plate ? (state.adapt.provs[plate] || 0) : 0;
   return 1 / (1 + 0.025 * t) / (1 + 0.45 * p);
 }
-function bumpFatigue(state, type, plate) {
+export function bumpFatigue(state, type, plate) {
   state.adapt.types[type] = (state.adapt.types[type] || 0) + 1;
   if (plate) state.adapt.provs[plate] = (state.adapt.provs[plate] || 0) + 1;
 }
@@ -75,12 +78,12 @@ export function ideologicalFit(state, plate, party = playerParty(state)) {
   return f;
 }
 
-function addCamp(state, plate, partyId, v) {
+export function addCamp(state, plate, partyId, v) {
   const c = state.camp[plate] || (state.camp[plate] = {});
   c[partyId] = (c[partyId] || 0) + v;
 }
-function addRecognition(p, v) { p.recognition = clamp(p.recognition + v * (1 - p.recognition), 0, 1); }
-function gaffeChance(state, base) {
+export function addRecognition(p, v) { p.recognition = clamp(p.recognition + v * (1 - p.recognition), 0, 1); }
+export function gaffeChance(state, base) {
   const trained = state.flags.trainedUntil && state.flags.trainedUntil >= state.date ? 0.5 : 1;
   return base * trained * (1 - 0.5 * skill(state, 'iletisimci')) * charMod(state, 'gaffe') * staffMod(state, 'gaffe');
 }
@@ -95,7 +98,7 @@ const CHANNELS = {
 };
 export { CHANNELS };
 
-function channelFriendliness(state, ch) {
+export function channelFriendliness(state, ch) {
   if (!CHANNELS[ch].audience) return 0.7;
   const cl = CLUSTERS.find(c => c.id === CHANNELS[ch].audience);
   return Math.exp(-2 * ideologyDistance(cl.ideo, playerParty(state).ideology));
@@ -171,6 +174,7 @@ export const ACTIONS = [
 
   // --- Saha ---
   { id: 'rally', cat: 'Saha', icon: '📣', label: 'Miting', ap: 2, params: ['province', 'venue', 'topic', 'speech', 'tone', 'transport'],
+    fx: (state, prm, res) => ({ visibility: res.anim?.empty ? [-2, 0] : [3, 6], morale: res.anim?.empty ? [-4, -2] : [1, 3], heat: prm.tone === 'sert' ? [5, 8] : [2, 4], ...(res.anim?.transport ? { trust: -3 } : {}) }),
     desc: 'İl, mekân, konuşma metni ve lojistiği seç. Hava durumu ve rakip mitingleri katılımı etkiler; dolmayan meydan manşet olur.',
     cost: (state, { province, venue = 'meydan', transport = 'yok' } = {}) => {
       const v = VENUES.find(x => x.id === venue) || VENUES[0], t = TRANSPORT.find(x => x.id === transport) || TRANSPORT[0];
@@ -249,7 +253,7 @@ export const ACTIONS = [
       return { title, bad, lines, anim: { kind: 'rally', crowd: Math.max(crowd, 100), capacity: e.capacity, province: name, empty, packed, gaffe, transport,
         color: p.color, short: p.short, fit: e.fit, venue: e.venue.id, weather: e.weather?.id || null, speech: e.speech.text } };
     } },
-  { id: 'visit', cat: 'Saha', icon: '🏪', label: 'Esnaf, STK ve mahalle ziyareti', ap: 1, params: ['province'],
+  { id: 'visit', cat: 'Saha', icon: '🏘️', label: 'Mahalle ziyareti', ap: 1, params: ['province'], fx: { trust: [0, 1], morale: [1, 2] },
     desc: 'Düşük maliyetli yüz yüze temas. Yerel güven ve teşkilat moralini artırır.',
     cost: () => 40000,
     estimate(state, { province }) {
@@ -267,8 +271,10 @@ export const ACTIONS = [
       return { title: `${PROVINCE_BY_PLATE[prm.province].name} ziyareti`, lines: [`İl kampanya etkisi +${camp.toFixed(2).replace('.', ',')}`, p.orgs[prm.province] ? 'Teşkilat morali yükseldi.' : 'Bu ilde teşkilatın yok; kalıcı etki sınırlı.'] , anim: { kind: 'visit', province: PROVINCE_BY_PLATE[prm.province].name, color: p.color } };
     } },
 
+  ...EXTRA_ACTIONS.saha,
+
   // --- Medya ---
-  { id: 'tv', cat: 'Medya', icon: '📺', label: 'Televizyon programı', ap: 1, params: ['channel'],
+  { id: 'tv', cat: 'Medya', icon: '📺', label: 'Canlı TV programı (soru-cevap)', ap: 1, params: ['channel'], fx: { visibility: [4, 7] },
     desc: 'Kanalın çizgisi önemli: dost kanalda mesaj rahat geçer ama yeni seçmen az; karşıt kanalda sorular serttir.',
     cost: () => 0,
     available(state, { channel } = {}) {
@@ -305,6 +311,7 @@ export const ACTIONS = [
       return { interactive: 'debate', debate: prepareDebate(state, rng), title: 'Liderler tartışması', lines: [] };
     } },
   { id: 'press', cat: 'Medya', icon: '🗞️', label: 'Basın açıklaması', ap: 1, params: ['topic', 'stance'],
+    fx: (state, prm, res) => ({ visibility: [2, 4], heat: res.anim?.score < -0.2 ? [4, 7] : [1, 2], ...(res.bad ? { trust: -2 } : {}) }),
     desc: 'Bir konuda tutum açıkla. Gazeteler, vatandaşlar, hükümet ve rakipler tepki verir. Tutumun hedef kitlesi farklıdır.', cost: () => 0,
     estimate(state, { topic = 'ekonomi', stance }) {
       const p = playerParty(state), f = fatigue(state, 'press');
@@ -327,9 +334,12 @@ export const ACTIONS = [
         anim: { kind: 'press', quote: r.stance.quote, stance: r.stance.label, reactions: r.reactions, score: r.score } };
     } },
 
+  ...EXTRA_ACTIONS.medya,
+
   // --- Sosyal medya: her kampanya ayrı eylem ---
   ...SOCIAL_CAMPAIGNS.map(def => ({
     id: 'social:' + def.id, cat: 'Sosyal medya', icon: def.icon, label: def.label, ap: def.ap, params: def.params,
+    fx: (state, prm, res) => ({ visibility: res.anim?.viral ? [6, 10] : [2, 4], ...(res.anim?.backfire ? { trust: -2 } : {}), ...(def.fx || {}) }),
     desc: def.desc, social: def, cost: () => def.cost,
     available(state) {
       const run = (state.socialCampaigns || []).find(c => c.id === def.id);
@@ -355,6 +365,9 @@ export const ACTIONS = [
         anim: { kind: 'social', def: def.id, viral: c.viral, backfire: c.backfire, views: c.views, likes: c.likes, shares: c.shares, comments: c.comments } };
     },
   })),
+
+  ...EXTRA_ACTIONS.vaat,
+  ...EXTRA_ACTIONS.rakip,
 
   // --- Diplomasi ---
   { id: 'polvisit', cat: 'Diplomasi', icon: '🤝', label: 'Siyasi ziyaret', ap: 1, params: ['target'],
@@ -454,7 +467,10 @@ export const ACTIONS = [
       return { title: 'Adaylık imza kampanyası', lines: [`${fmtInt(g)} yeni imza`, `Toplam: ${fmtInt(state.flags.cbSignatures)} / ${fmtInt(SIGNATURES_NEEDED)}`], anim: { kind: 'signatures', value: Math.min(100, state.flags.cbSignatures / SIGNATURES_NEEDED * 100), need: 100 } };
     } },
 
+  ...EXTRA_ACTIONS.cb,
+
   // --- Teşkilat ---
+  ...EXTRA_ACTIONS.teskilat,
   { id: 'buildOrg', cat: 'Teşkilat', icon: '🏢', label: 'İl teşkilatı kur', ap: 1, params: ['province'], foundOnly: true,
     desc: 'İl başkanlığı açar. Seçime girmek için en az 41 ilde teşkilat gerekir.',
     cost: (state) => Math.round(250000 * (1 - 0.3 * skill(state, 'orgutcu'))),
@@ -489,7 +505,7 @@ export const ACTIONS = [
       for (const pv of list) p.building[pv.plate] = w;
       return { title: `${prm.region} bölgesinde teşkilat hamlesi`, lines: [`${list.length} ilde il başkanlığı ${w} hafta içinde açılacak.`] , anim: { kind: 'org', plates: list.map(x => x.plate), label: `${prm.region} teşkilat hamlesi`, color: p.color } };
     } },
-  { id: 'strengthenOrg', cat: 'Teşkilat', icon: '💪', label: 'Teşkilatı güçlendir', ap: 1, params: ['province'],
+  { id: 'strengthenOrg', cat: 'Teşkilat', icon: '💪', label: 'Teşkilatı güçlendir', ap: 1, params: ['province'], fx: { morale: [1, 2] },
     desc: 'İlçe teşkilatları, gönüllü ağı ve sandık görevlileri. Oy ve sandık güvenliğine etki eder.',
     cost: (state, { province } = {}) => Math.round(120000 * (1 + (province ? (playerParty(state).orgs[province] || 0) : 0)) * (1 - 0.2 * skill(state, 'orgutcu'))),
     available(state, { province } = {}) {
@@ -507,7 +523,7 @@ export const ACTIONS = [
       p.orgs[prm.province] = clamp((p.orgs[prm.province] || 0) + g, 0, 1);
       return { title: `${PROVINCE_BY_PLATE[prm.province].name} teşkilatı güçlendi`, lines: [`Teşkilat gücü ${pct(e.current, 0)} → ${pct(p.orgs[prm.province], 0)}`] , anim: { kind: 'strengthen', from: e.current, to: p.orgs[prm.province], province: PROVINCE_BY_PLATE[prm.province].name, color: p.color } };
     } },
-  { id: 'members', cat: 'Teşkilat', icon: '🪪', label: 'Üye kampanyası', ap: 1, desc: 'Yeni üyeler aidat geliri ve gönüllü demektir.',
+  { id: 'members', cat: 'Teşkilat', icon: '🪪', label: 'Üye kampanyası', ap: 1, fx: { morale: [1, 2] }, desc: 'Yeni üyeler aidat geliri ve gönüllü demektir.',
     cost: () => 80000,
     estimate(state) {
       const p = playerParty(state);
@@ -523,18 +539,31 @@ export const ACTIONS = [
       p.members += m; bumpFatigue(state, 'members');
       return { title: 'Üye kampanyası', lines: [`${fmtInt(m)} yeni üye`] , anim: { kind: 'members', count: m, total: p.members, color: p.color } };
     } },
-  { id: 'fundraise', cat: 'Teşkilat', icon: '💰', label: 'Bağış kampanyası', ap: 1, desc: 'Bağış toplama yemeği ve kampanya. Küçük bir usulsüzlük riski var.',
+  { id: 'fundraise', cat: 'Teşkilat', icon: '💰', label: 'Bağış kampanyası', ap: 1, params: ['choice:fund'],
+    desc: 'Küçük bağış kampanyası, büyük bağışçı toplantısı ya da online kitle fonlaması. Büyük bağışçılar ileride karşılık isteyebilir.',
+    choices(state) {
+      const burned = state.flags.donorBurned && addDays(state.flags.donorBurned, 182) > state.date;
+      return { fund: [
+        { id: 'kucuk', icon: '🪙', label: 'Küçük bağış kampanyası', meta: 'dengeli, küçük usulsüzlük riski' },
+        { id: 'buyuk', icon: '💼', label: 'Büyük bağışçı / iş dünyası yemeği', meta: 'yaklaşık 3 kat para · karşılık isteyebilir', disabled: burned ? 'Bağışçılar 6 ay boyunca mesafeli' : false },
+        { id: 'online', icon: '📲', label: 'Online kitle fonlaması', meta: 'daha az para · güven ve görünürlük +' },
+      ] };
+    },
+    fx: (state, prm) => prm.fund === 'online' ? { trust: [1, 2], visibility: [1, 3], morale: [1, 2] } : prm.fund === 'buyuk' ? { trust: [-1, 0] } : null,
     cost: () => 30000,
-    estimate(state) {
+    estimate(state, prm = {}) {
       const p = playerParty(state);
       const poll = state.polls.length ? (state.polls[state.polls.length - 1].shares[p.id] || 0) : 0;
-      const m = (150000 + 2_500_000 * p.recognition + 20_000_000 * poll) * (1 + 0.5 * skill(state, 'finansci')) * diff(state).money * fatigue(state, 'fundraise') * priceIndex(state) * charMod(state, 'fundraise');
-      return { money: [m * 0.5, m * 1.4], risk: 0.05 * (1 - 0.7 * skill(state, 'hukukcu')) * charMod(state, 'scandal') * staffMod(state, 'scandal') };
+      const kind = { kucuk: 1, buyuk: 3, online: 0.6 * (1 + 0.15 * (state.player.infra?.uygulama || 0)) }[prm.fund || 'kucuk'];
+      const chill = state.flags.donorChill && state.flags.donorChill > state.date && prm.fund === 'buyuk' ? 0.85 : 1;
+      const m = (150000 + 2_500_000 * p.recognition + 20_000_000 * poll) * kind * chill * (1 + 0.5 * skill(state, 'finansci')) * diff(state).money * fatigue(state, 'fundraise') * priceIndex(state) * charMod(state, 'fundraise');
+      return { money: [m * 0.5, m * 1.4], risk: (prm.fund === 'online' ? 0.01 : 0.05) * (1 - 0.7 * skill(state, 'hukukcu')) * charMod(state, 'scandal') * staffMod(state, 'scandal'), note: prm.fund === 'buyuk' ? 'Bağışçı birkaç hafta sonra karşılık isteyebilir' : null };
     },
     run(state, prm, rng) {
-      const p = playerParty(state), e = this.estimate(state);
+      const p = playerParty(state), e = this.estimate(state, prm);
       const m = Math.round(rng.range(...e.money));
       p.money += m; bumpFatigue(state, 'fundraise');
+      if (prm.fund === 'buyuk') schedule(state, { weeks: 4, id: 'bagisci', chance: 0.7 });
       const lines = [`Toplanan bağış: ${fmtMoney(m)}`];
       let bad = false;
       if (rng.chance(e.risk)) {
@@ -553,6 +582,7 @@ export const ACTIONS = [
       if (p.congressDate && addDays(p.congressDate, 365) > state.date) return 'Son kongrenin üzerinden en az 1 yıl geçmeli.';
       return true;
     },
+    fx: { morale: [4, 7], visibility: [3, 5] },
     estimate() { return { unity: [3, 8], recognition: [0.01, 0.03] }; },
     run(state, prm, rng) {
       const p = playerParty(state), e = this.estimate();
@@ -564,7 +594,7 @@ export const ACTIONS = [
     } },
 
   // --- Parti içi ---
-  { id: 'meeting', cat: 'Parti içi', icon: '🗣️', label: 'Parti içi toplantı', ap: 1, desc: 'MYK ve il başkanlarıyla toplantı. İç huzuru artırır.',
+  { id: 'meeting', cat: 'Parti içi', icon: '🗣️', label: 'Parti içi toplantı', ap: 1, fx: { morale: [2, 4] }, desc: 'MYK ve il başkanlarıyla toplantı. İç huzuru ve teşkilat moralini artırır.',
     cost: () => 20000, estimate() { return { unity: [3, 8] }; },
     run(state, prm, rng) {
       const p = playerParty(state), u = rng.range(3, 8);
@@ -587,10 +617,32 @@ export function availableActions(state) {
 }
 
 // Tüm maliyetler Haziran 2023 fiyatlarıyla tanımlı; oyun içi enflasyonla ölçeklenir
-export function actionCost(state, action, prm = {}) { return Math.round(action.cost(state, prm) * priceIndex(state)); }
+export function actionCost(state, action, prm = {}) { return Math.round(action.cost(state, withDefaults(state, action, prm)) * priceIndex(state)); }
+
+// Seçimli eylemlerde eksik seçimi ilk uygun seçenekle doldur
+export function withDefaults(state, action, prm = {}) {
+  if (!action.choices) return prm;
+  const out = { ...prm };
+  for (const [k, list] of Object.entries(action.choices(state, out))) {
+    if (out[k] === undefined || !list.some(x => x.id === out[k])) out[k] = (list.find(x => !x.disabled) || list[0])?.id;
+  }
+  if ((action.params || []).includes('rival') && !out.rival) out.rival = Object.values(state.parties).filter(p => !p.aggregate && !p.dissolved && p.id !== state.player.partyId).sort((a, b) => (b.lastShare || 0) - (a.lastShare || 0))[0]?.id;
+  return out;
+}
+
+export const apOf = (action, prm = {}) => action.apFor ? action.apFor(prm) : action.ap;
 
 export function canRun(state, action, prm = {}) {
-  if (state.player.ap < action.ap) return `Yeterli eylem puanı yok (${action.ap} gerekli).`;
+  prm = withDefaults(state, action, prm);
+  const ap = apOf(action, prm);
+  if (state.player.ap < ap) return `Yeterli eylem puanı yok (${ap} gerekli).`;
+  if (action.choices) {
+    for (const [k, list] of Object.entries(action.choices(state, prm))) {
+      const c = list.find(x => x.id === prm[k]);
+      if (!c) return 'Bir seçenek seç.';
+      if (c.disabled) return typeof c.disabled === 'string' ? c.disabled : 'Bu seçenek şu an kullanılamaz.';
+    }
+  }
   const cost = actionCost(state, action, prm);
   const purse = action.personal ? state.player.personalMoney : playerParty(state).money;
   if (cost > 0 && purse < cost) return `Yeterli para yok (${fmtMoney(cost)} gerekli).`;
@@ -599,14 +651,20 @@ export function canRun(state, action, prm = {}) {
 }
 
 export function runAction(state, action, prm, rng) {
+  prm = withDefaults(state, action, prm);
   const ok = canRun(state, action, prm);
   if (ok !== true) return { error: ok };
   const cost = actionCost(state, action, prm);
   if (action.personal) state.player.personalMoney -= cost; else playerParty(state).money -= cost;
   state.stats.moneySpent += cost;
-  state.player.ap -= action.ap;
+  state.player.ap -= apOf(action, prm);
+  ensureMetrics(state);
   const res = action.run(state, prm, rng);
   res.cost = cost;
+  if (!res.interactive || action.fx) {
+    const extra = typeof action.fx === 'function' ? action.fx(state, prm, res) : action.fx;
+    if (extra) res.fx = [...(res.fx || []), ...applyFx(state, extra, rng)];
+  }
   state.log.push({ date: state.date, action: action.id, prm, title: res.title });
   if (state.log.length > 300) state.log.shift();
   return res;
@@ -614,10 +672,23 @@ export function runAction(state, action, prm, rng) {
 
 // Önizleme metni (arayüz için)
 export function describeEstimate(state, action, prm) {
+  prm = withDefaults(state, action, prm);
   const e = action.estimate(state, prm);
   const out = [];
   if (e.audience && Object.keys(e.audience).length) out.push(['Hedef kitle', Object.entries(e.audience).sort((a, b) => b[1] - a[1]).filter(([, v]) => v >= 0.5).map(([k]) => CLUSTERS.find(c => c.id === k).label).join(', ') || 'Geniş kitle']);
   if (e.econNote) out.push(['Etki', e.econNote]);
+  if (e.note) out.push(['Not', e.note]);
+  if (e.levelInfo) out.push(['Seviye', e.levelInfo]);
+  if (e.mobInfo) out.push(['Sandık etkisi', e.mobInfo]);
+  if (e.securityInfo) out.push(['Sandık güvenliği', e.securityInfo]);
+  if (e.after !== undefined) out.push(['Vaat yükü', `₺${e.load} → ₺${e.after} milyar (inandırıcı sınır ₺${e.cap})`], ['İnandırıcılık', e.cred >= 1 ? 'Yüksek' : e.cred >= 0.7 ? 'Orta' : 'Düşük: etkisi azalır']);
+  if (e.segPower) out.push(['Hedef grupta etki', `+${(e.segPower * 0.7).toFixed(3).replace('.', ',')} … +${(e.segPower * 1.3).toFixed(3).replace('.', ',')}`]);
+  if (e.promisePower) out.push(['Kalıcı destek', `+${e.promisePower.toFixed(3).replace('.', ',')} (yavaş söner)`]);
+  if (e.hit) out.push(['Rakibin ivmesi', `−${(e.hit[0] * 100).toFixed(1).replace('.', ',')} … −${(e.hit[1] * 100).toFixed(1).replace('.', ',')}${e.dossier ? ' (dosya +%50)' : ''}`]);
+  if (e.dirtyRisk) out.push(['⚠️ Etik dışı', `Yakalanma riski ~%${Math.round(e.dirtyRisk * 100)}: güven, imaj ve ivme çöker`]);
+  if (e.fxPrev) out.push(...e.fxPrev);
+  const afx = typeof action.fx === 'function' ? null : action.fx;
+  if (afx) out.push(...fxPreview(afx));
   if (e.lawSupport !== undefined) out.push(['Kamuoyu desteği', pct(e.lawSupport, 0)], ['Meclis', `${e.seats} sandalye / gereken ${e.need}`]);
   if (e.signaturesCb) out.push(['Yeni imza', `${fmtInt(e.signaturesCb[0])} … ${fmtInt(e.signaturesCb[1])}`], ['Toplanan', `${fmtInt(state.flags.cbSignatures || 0)} / ${fmtInt(SIGNATURES_NEEDED)}`]);
   if (e.visitChance !== undefined) out.push(['Kabul ihtimali', pct(e.visitChance, 0)]);

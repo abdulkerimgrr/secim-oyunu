@@ -1,6 +1,6 @@
 // Kampanya sekmesi: eylem kartları ve parametre/önizleme sayfası.
 import { esc, sheet, toast } from '../dom.js';
-import { availableActions, canRun, describeEstimate, CHANNELS, actionCost } from '../../engine/actions.js';
+import { availableActions, canRun, describeEstimate, CHANNELS, actionCost, withDefaults, apOf } from '../../engine/actions.js';
 import { TOPICS } from '../../data/clusters.js';
 import { PROVINCES } from '../../data/generated/provinces.js';
 import { REGION_NAMES } from '../../engine/regions.js';
@@ -46,19 +46,31 @@ function defaults(action, prm) {
   return p;
 }
 
+const CAT_ORDER = ['Kurultay', 'Saha', 'Medya', 'Sosyal medya', 'Vaatler', 'Rakip operasyonları', 'Diplomasi', 'Cumhurbaşkanlığı', 'Teşkilat', 'Parti içi'];
+const CAT_SUB = { 'Sosyal medya': 'her kampanya farklı kitleye ulaşır', Vaatler: 'kalıcı destek, ama bütçe yükü', 'Rakip operasyonları': 'saldırgan hamleler saldırı riskini artırır', Saha: 'yüz yüze temas: güven ve moral' };
+const choiceLabel = k => ({ meet: 'Buluşma türü', field: 'Tur türü', format: 'Program', promise: 'Vaat', op: 'Hamle', infra: 'Altyapı', fund: 'Bağış yöntemi' }[k] || 'Seçenek');
+
+function choiceHtml(s, action, prm) {
+  if (!action.choices) return '';
+  return Object.entries(action.choices(s, prm)).map(([k, list]) => `<div class="f">${choiceLabel(k)}<div class="choice-grid ${list.length > 6 ? 'many' : ''}">${list.map(c => `<button class="select-card choice ${prm[k] === c.id ? 'on' : ''} ${c.dirty ? 'dirty' : ''}" data-choice="${k}" data-v="${c.id}" ${c.disabled ? 'disabled' : ''}>
+    <span class="ci">${c.icon || ''}</span><div style="flex:1;min-width:0"><b class="small">${esc(c.label)}</b>${c.meta ? `<div class="small muted">${esc(c.meta)}</div>` : ''}${c.desc ? `<div class="small muted cdesc">${esc(c.desc)}</div>` : ''}${c.disabled && typeof c.disabled === 'string' ? `<div class="small" style="color:var(--bad)">${esc(c.disabled)}</div>` : ''}${c.level !== undefined ? `<div class="lvl">${[1, 2, 3, 4].map(i => `<i class="${i <= c.level ? 'on' : ''}"></i>`).join('')}</div>` : ''}</div></button>`).join('')}</div></div>`).join('');
+}
+
 export function openAction(ctx, action, prm0 = {}) {
   const s = ctx.state;
-  let prm = defaults(action, prm0);
+  let prm = withDefaults(s, action, defaults(action, prm0));
   const sh = sheet('<div></div>');
   const body = sh.root.lastElementChild;
   const draw = () => {
     const ok = canRun(s, action, prm);
     const cost = actionCost(s, action, prm);
     const est = describeEstimate(s, action, prm);
-    const params = action.params || [];
+    const params = (action.params || []).filter(k => !action.showParam || action.showParam(prm, k));
     const needProv = params.includes('province') || (params.includes('channel') && prm.channel === 'yerel');
     body.innerHTML = `<div class="row"><span style="font-size:26px" aria-hidden="true">${action.icon}</span><div style="flex:1;min-width:0"><div class="eyebrow">${esc(action.cat)}</div><h2>${esc(action.label)}</h2></div></div>
       <p class="small" style="margin:0">${esc(action.desc)}</p>
+      ${params.includes('rival') ? `<div class="f">Rakip<div class="chips wrap">${Object.values(s.parties).filter(p => !p.aggregate && !p.dissolved && p.id !== s.player.partyId).sort((a, b) => (b.lastShare || 0) - (a.lastShare || 0)).map(p => `<button class="chip ${prm.rival === p.id ? 'on' : ''}" data-rival="${p.id}"><i class="swatch" style="background:${p.color}"></i> ${esc(p.short)}</button>`).join('')}</div></div>` : ''}
+      ${choiceHtml(s, action, prm)}
       ${needProv ? `<label class="f">İl<select class="in" id="p-prov">${PROV_SORTED.map(p => `<option value="${p.plate}" ${+prm.province === p.plate ? 'selected' : ''}>${esc(p.name)} · ${p.seats} mv${playerParty(s).orgs[p.plate] ? ' · teşkilat ✓' : ''}</option>`).join('')}</select></label>` : ''}
       ${params.includes('region') ? `<div class="f">Bölge<div class="chips">${REGION_NAMES.map(r => `<button class="chip ${prm.region === r ? 'on' : ''}" data-region="${r}">${r}</button>`).join('')}</div></div>` : ''}
       ${params.includes('faction') ? `<div class="f">Hizip<div class="list">${s.player.kurultay.factions.map(f => `<button class="select-card ${prm.faction === f.id ? 'on' : ''}" data-faction="${f.id}" style="padding:10px;margin-top:6px"><div style="flex:1"><b>${esc(f.label)}</b> <span class="small muted">· ağırlık %${Math.round(f.weight * 100)}</span><div class="small muted">${esc(f.desc)} · desteğin %${Math.round(f.support)}</div></div></button>`).join('')}</div></div>` : ''}
@@ -77,10 +89,12 @@ export function openAction(ctx, action, prm0 = {}) {
       ${params.includes('transport') ? `<div class="f">Lojistik / taşıma<div class="chips wrap">${TRANSPORT.map(t => `<button class="chip ${prm.transport === t.id ? 'on' : ''}" data-transport="${t.id}">${t.label}</button>`).join('')}</div></div>` : ''}
       ${params.includes('tone') ? `<div class="f">Ton<div class="chips">${TONES.map(([k, l]) => `<button class="chip ${prm.tone === k ? 'on' : ''}" data-tone="${k}">${l}</button>`).join('')}</div></div>` : ''}
       <div class="card" style="background:var(--bg);box-shadow:none"><div class="eyebrow" style="margin-bottom:6px">Beklenen etki <span style="text-transform:none;letter-spacing:0;font-weight:500">(gerçek sonuç şansa ve gizli etkenlere bağlı)</span></div>
-        <dl class="kv"><dt>Eylem puanı</dt><dd>${action.ap}</dd><dt>Maliyet</dt><dd>${cost ? fmtMoney(cost) : 'Ücretsiz'}${action.personal ? ' (kişisel)' : ''}</dd>${est.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>
+        <dl class="kv"><dt>Eylem puanı</dt><dd>${apOf(action, prm)}</dd><dt>Maliyet</dt><dd>${cost ? fmtMoney(cost) : 'Ücretsiz'}${action.personal ? ' (kişisel)' : ''}</dd>${est.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>
       ${ok !== true ? `<p class="small" style="color:var(--bad);margin:0">${esc(ok)}</p>` : ''}
       <button class="btn red block" id="p-go" ${ok === true ? '' : 'disabled'}>Uygula</button>`;
     body.querySelector('#p-prov')?.addEventListener('change', e => { prm.province = +e.target.value; if (params.includes('speech')) prm.speech = 's0'; draw(); });
+    body.querySelectorAll('[data-choice]').forEach(b => b.onclick = () => { prm[b.dataset.choice] = b.dataset.v; prm = withDefaults(s, action, prm); draw(); });
+    body.querySelectorAll('[data-rival]').forEach(b => b.onclick = () => { prm.rival = b.dataset.rival; draw(); });
     body.querySelectorAll('[data-faction]').forEach(b => b.onclick = () => { prm.faction = b.dataset.faction; draw(); });
     body.querySelectorAll('[data-region]').forEach(b => b.onclick = () => { prm.region = b.dataset.region; draw(); });
     body.querySelectorAll('[data-channel]').forEach(b => b.onclick = () => { prm.channel = b.dataset.channel; prm = defaults(action, prm); draw(); });
@@ -133,7 +147,7 @@ function runningCampaigns(s) {
 export function renderCampaign(view, ctx) {
   const s = ctx.state;
   const acts = availableActions(s);
-  const cats = [...new Set(acts.map(a => a.cat))];
+  const cats = [...new Set(acts.map(a => a.cat))].sort((a, b) => (CAT_ORDER.indexOf(a) + 99) % 99 - (CAT_ORDER.indexOf(b) + 99) % 99);
   const pre = s.player.mode === 'join' && !s.player.isLeader;
   view.insertAdjacentHTML('beforeend', `<section class="card"><h2>${pre ? 'Kurultay kampanyası' : 'Bu turun eylemleri'}</h2>
     <p class="small muted" style="margin:0">Kalan eylem puanı: <b style="color:var(--ink)">${s.player.ap}</b>. ${s.phase === 'campaign' ? 'Kampanya döneminde her tur bir gün ve 3 puandır.' : 'Her hafta puanların yenilenir; kullanılmayan puan aktarılmaz.'}
@@ -143,13 +157,13 @@ export function renderCampaign(view, ctx) {
     const sec = document.createElement('section');
     sec.className = 'card anim-in';
     sec.style.animationDelay = `${ci * 70}ms`;
-    sec.innerHTML = `<h2>${esc(cat)}${cat === 'Sosyal medya' ? ' <small>her kampanya farklı kitleye ulaşır</small>' : ''}</h2><div class="list">${acts.filter(a => a.cat === cat).map((a, ai) => {
-      const c = a.params && !a.social ? null : actionCost(s, a, {});
+    sec.innerHTML = `<h2>${esc(cat)}${CAT_SUB[cat] ? ` <small>${CAT_SUB[cat]}</small>` : ''}</h2><div class="list">${acts.filter(a => a.cat === cat).map((a, ai) => {
+      const c = (a.params && !a.social) || a.choices ? null : actionCost(s, a, {});
       const running = a.social && (s.socialCampaigns || []).find(x => x.id === a.social.id);
       return `<button class="li anim-in" data-action="${a.id}" style="background:none;border:0;text-align:left;width:100%;animation-delay:${ci * 70 + ai * 40}ms">
         <span class="act-ico" style="font-size:24px;width:32px;text-align:center" aria-hidden="true">${a.icon}</span>
-        <div class="grow"><div class="t">${esc(a.label)}${running ? ' <span class="pill good">sürüyor</span>' : ''}</div>${a.social ? `<div class="small muted">${esc(a.social.platform)} · ${a.social.weeks} hafta</div>` : ''}<div class="small muted">${esc(a.desc)}</div>${a.social ? audChips(a.social.audience) : ''}</div>
-        <div style="text-align:right;white-space:nowrap"><div class="small"><b>${a.ap}</b> puan</div><div class="small muted">${c === null ? 'değişken' : c ? esc(fmtMoney(c)) : 'ücretsiz'}</div></div></button>`;
+        <div class="grow"><div class="t">${esc(a.label)}${running ? ' <span class="pill good">sürüyor</span>' : ''}${a.social?.dirtyTag ? ' <span class="pill bad">⚠️ etik dışı</span>' : a.social?.dirty ? ' <span class="pill warn">gri alan</span>' : ''}</div>${a.social ? `<div class="small muted">${esc(a.social.platform)} · ${a.social.weeks} hafta</div>` : ''}<div class="small muted">${esc(a.desc)}</div>${a.social ? audChips(a.social.audience) : ''}</div>
+        <div style="text-align:right;white-space:nowrap"><div class="small"><b>${a.apFor ? '1–2' : a.ap}</b> puan</div><div class="small muted">${c === null ? 'değişken' : c ? esc(fmtMoney(c)) : 'ücretsiz'}</div></div></button>`;
     }).join('')}</div>`;
     view.appendChild(sec);
   });

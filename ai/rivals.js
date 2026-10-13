@@ -26,12 +26,17 @@ export function rivalsAct(state, rng, scale = 1) {
     if (p.dissolved || p.aggregate || (p.isPlayer && myIsLeader) || p.resources <= 0) continue;
     const n = Math.max(0, Math.round((p.resources * 0.8 + rng.range(-0.3, 0.6)) * diff.rival * scale + (rng.next() < (scale % 1) ? 1 : 0)));
     const isOpp = !state.government.includes(p.id);
-    const threat = myIsLeader && me.id !== p.id && myPoll > 0.02 && ideologyDistance(p.ideology, me.ideology) < 0.75 && rng.next() > (state.relations?.[p.id] || 0) / 150;
+    const heat = state.player.heat ?? 10;
+    const threat = myIsLeader && me.id !== p.id && (myPoll > 0.02 || heat > 40) && (ideologyDistance(p.ideology, me.ideology) < 0.75 || heat > 55) && rng.next() > (state.relations?.[p.id] || 0) / 150;
     for (let i = 0; i < n; i++) {
       const r = rng.next();
       const eff = (0.6 + 0.4 * p.media) * diff.rival;
-      if (threat && r < 0.15 + Math.min(0.25, myPoll * 3)) {
-        me.momentum -= rng.range(0.005, 0.02) * eff * (state.flags.shieldUntil && state.flags.shieldUntil >= state.date ? 0.5 : 1);
+      if (threat && r < (0.15 + Math.min(0.25, myPoll * 3)) * (0.6 + heat / 50)) {
+        const shield = state.flags.shieldUntil && state.flags.shieldUntil >= state.date ? 0.5 : 1;
+        const dmg = rng.range(0.005, 0.02) * eff * shield;
+        me.momentum -= dmg;
+        if (me.trust !== undefined) me.trust = Math.max(0, me.trust - rng.range(0.2, 0.8) * shield * (0.5 + heat / 100));
+        state.flags.lastAttack = { party: p.id, date: state.date, dmg: (state.flags.lastAttack?.party === p.id && state.flags.lastAttack.date === state.date ? state.flags.lastAttack.dmg : 0) + dmg };
         if (newsBudget-- > 0) addNews(state, 'rival', fill(rng.pick(NEWS_TEMPLATES.attackPlayer), { party: p.short, target: me.short }));
       } else if (isOpp && misery > 3 && r < 0.4) {
         p.momentum += rng.range(0.003, 0.012) * eff;

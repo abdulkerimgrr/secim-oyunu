@@ -15,6 +15,7 @@ import { candidatesFor, hire, fire } from '../../engine/staff.js';
 import { sheet, toast } from '../dom.js';
 import { saveGame } from '../../engine/save.js';
 import { priceIndex } from '../../engine/util.js';
+import { renderPartyMetrics } from './partyMetrics.js';
 
 export function renderParty(view, ctx) {
   const s = ctx.state;
@@ -31,6 +32,8 @@ export function renderParty(view, ctx) {
       <div class="stat"><div class="v">${me.seats}</div><div class="l">Milletvekili</div></div></div>
     ${me.alliance ? `<p class="small" style="margin:8px 0 0">İttifak: <b>${esc(s.alliances[me.alliance]?.name)}</b></p>` : ''}
     ${pre ? `<p class="small muted" style="margin:8px 0 0">Henüz genel başkan değilsin; parti yönetimi mevcut liderde. Kişisel bütçen: <b>${fmtMoney(s.player.personalMoney)}</b>.</p>` : ''}</section>`);
+
+  if (!pre) renderPartyMetrics(view, ctx);
 
   const c = s.player.character;
   if (c) view.insertAdjacentHTML('beforeend', `<section class="card"><h2>${pre ? 'Aday profili' : 'Genel başkan'}</h2>
@@ -51,7 +54,7 @@ export function renderParty(view, ctx) {
 
   if (!pre) {
     const b = weeklyBudget(s);
-    const L = { aidat: 'Üye aidatları', hazine: 'Hazine yardımı', bagis: 'Düzenli bağışlar', genelMerkez: 'Genel merkez', teskilat: 'Teşkilat giderleri', personel: 'Personel', ekip: 'Ekip maaşları' };
+    const L = { aidat: 'Üye aidatları', hazine: 'Hazine yardımı', bagis: 'Düzenli bağışlar', genelMerkez: 'Genel merkez', teskilat: 'Teşkilat giderleri', personel: 'Personel', ekip: 'Ekip maaşları', altyapi: 'Seçim altyapısı bakımı' };
     view.insertAdjacentHTML('beforeend', `<section class="card"><h2>Bütçe <small>haftalık</small></h2>
       <div class="row" style="justify-content:space-between;margin-bottom:6px"><span>Kasa</span><b class="num" style="font-family:var(--f-display);font-size:24px;color:${me.money < 0 ? 'var(--bad)' : 'var(--ink)'}">${fmtMoney(me.money)}</b></div>
       <dl class="kv">${Object.entries(b.income).map(([k, v]) => `<dt>+ ${L[k]}</dt><dd style="color:var(--good)">${fmtMoney(v)}</dd>`).join('')}

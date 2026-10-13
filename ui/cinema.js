@@ -1,5 +1,6 @@
 // Eylem animasyonları: her eylem türü için kısa sahne + animasyonlu sonuç paneli.
 // Sahneye dokunmak animasyonu atlar; "hareketi azalt" ayarında doğrudan son kare gösterilir.
+import { fmtFxValue } from '../engine/metrics.js';
 import { esc, el } from './dom.js';
 import { avatarSvg } from './avatar.js';
 import { mixColor } from './map.js';
@@ -109,8 +110,8 @@ function sceneVisit(s, a) {
         <path d="M0 18 h64 v12 ${[0, 1, 2, 3].map(k => `l-8 6 l-8 -6`).join(' ')} z" fill="${c}"/><rect x="8" y="44" width="22" height="30" fill="#9EC1E0"/><rect x="36" y="56" width="20" height="64" fill="#7A5236"/></g>`).join('')}
       <rect y="160" width="360" height="40" fill="#8C8F96"/><rect y="158" width="360" height="4" fill="#B8BBC2"/></svg>
       <div class="sc-walker">${avatarSvg(s.player.character, { size: 64, bg: 'transparent' })}</div>
-      ${['🤝', '☕', '👋', '🫖', '😊'].map((e, i) => `<span class="sc-bubble" style="left:${12 + i * 19}%;animation-delay:${400 + i * 300}ms">${e}</span>`).join('')}
-      <div class="sc-counter"><span>${esc(a.province)}</span><b>Esnaf turu</b></div>`,
+      ${(a.icons || ['🤝', '☕', '👋', '🫖', '😊']).map((e, i) => `<span class="sc-bubble" style="left:${12 + i * 19}%;animation-delay:${400 + i * 300}ms">${e}</span>`).join('')}
+      <div class="sc-counter"><span>${esc(a.province)}</span><b>${esc(a.label || 'Mahalle ziyareti')}</b></div>`,
     ms: 2200,
   };
 }
@@ -129,7 +130,7 @@ function sceneSocial(s, a) {
   const stats = `<div class="ph-stats"><span>👁 <b id="sv">0</b></span><span>❤️ <b id="sl">0</b></span><span>🔁 <b id="ss">0</b></span><span>💬 <b id="sc">0</b></span></div>`;
   const media = `<div class="ph-media" style="background:linear-gradient(135deg, ${me.color}, ${mixColor(me.color, '#14213D', 0.5)})"><span>${def.icon}</span></div>`;
   let inner;
-  switch (def.id) {
+  switch (def.skin || def.id) {
     case 'kisavideo': inner = `<div class="tt"><div class="tt-video" style="background:linear-gradient(160deg, ${me.color}, #0B0F1A)">${avatarSvg(s.player.character, { size: 110, bg: 'transparent', mood: 'smile' })}</div>
       <div class="tt-side"><span>❤️<b id="sl">0</b></span><span>💬<b id="sc">0</b></span><span>↗️<b id="ss">0</b></span></div>
       <div class="tt-cap"><b>${esc(handle)}</b><p>${esc(def.post)} #siyaset #seçim</p><small>♪ kampanya müziği · orijinal ses</small></div><div class="tt-views">▶ <b id="sv">0</b></div></div>`; break;
@@ -347,6 +348,51 @@ function sceneCb(s, a) {
   };
 }
 
+function sceneStudio(s, a) {
+  const me = playerParty(s);
+  return {
+    cls: 'sc-studio',
+    html: `<div class="st-bg" style="background:radial-gradient(120% 90% at 50% 10%, ${mixColor('#1B2A4A', me.color, 0.25)}, #070C18)"></div>
+      <div class="st-onair">● ${a.channel ? 'CANLI' : 'YAYINDA'}</div>
+      <div class="st-logo">${a.icon} ${esc(a.channel || a.label)}</div>
+      <div class="st-host">${avatarSvg(s.player.character, { size: 110, bg: 'transparent', mood: a.bad ? 'tense' : 'smile' })}</div>
+      <div class="st-desk" style="border-top-color:${me.color}"></div>
+      <div class="st-lower"><b>${esc(s.player.name)}</b><span>${esc(me.short)} Genel Başkanı · ${esc(a.label)}</span></div>
+      <div class="st-meter"><span>İzlenme</span><b id="st-v">0</b></div>`,
+    ms: 2200,
+    start(stage) { countUp(stage.querySelector('#st-v'), Math.round(rnd(180, 2400)) * 1000, { ms: 1800 }); },
+  };
+}
+
+function scenePromise(s, a) {
+  const me = playerParty(s);
+  return {
+    cls: 'sc-promise',
+    html: `<div class="pm-stage" style="background:linear-gradient(180deg, ${mixColor('#0E1730', me.color, 0.35)}, #0E1730)">
+      <div class="pm-banner" style="background:${me.color}"><span>${a.icon}</span><b>${esc(a.label)}</b></div>
+      <div class="pm-speaker">${avatarSvg(s.player.character, { size: 96, bg: 'transparent' })}</div>
+      <div class="pm-cost ${a.bad ? 'bad' : ''}">Yıllık maliyet<b>₺${a.cost} milyar</b></div></div>`,
+    ms: 2200,
+  };
+}
+
+function sceneOppo(s, a) {
+  return {
+    cls: 'sc-oppo',
+    html: `<div class="op-desk"><div class="op-file ${a.dirty ? 'dirty' : ''}"><span class="op-tab" style="background:${a.targetColor}">${esc(a.target)}</span><b>${a.dirty ? 'GİZLİ' : 'DOSYA'}</b><i>${a.icon}</i><small>${esc(a.label)}</small></div>
+      ${a.bad ? '<div class="stamp">İFŞA</div>' : ''}</div>`,
+    ms: 1900,
+  };
+}
+
+function sceneInfra(s, a) {
+  return {
+    cls: 'sc-infra',
+    html: `<div class="if-card"><span class="if-ico">${a.icon}</span><b>${esc(a.label)}</b><div class="if-lvl">${[1, 2, 3, 4].map(i => `<i class="${i <= a.level ? 'on' : ''}" style="animation-delay:${i * 220}ms;${i <= a.level ? `background:${a.color}` : ''}"></i>`).join('')}</div><small>Seviye ${a.level} / 4</small></div>`,
+    ms: 1700,
+  };
+}
+
 function sceneGeneric(s, action) {
   return { cls: 'sc-generic', html: `<div class="sc-center big">${action.icon}</div>`, ms: 900 };
 }
@@ -369,6 +415,10 @@ function buildScene(s, action, a) {
     case 'polvisit': return scenePolVisit(s, a);
     case 'foreign': return sceneForeign(s, a);
     case 'cb': return sceneCb(s, a);
+    case 'studio': return sceneStudio(s, a);
+    case 'promise': return scenePromise(s, a);
+    case 'oppo': return sceneOppo(s, a);
+    case 'infra': return sceneInfra(s, a);
     default: return sceneGeneric(s, action);
   }
 }
@@ -445,6 +495,10 @@ function playSound(a, res) {
     case 'polvisit': if (a.ok) { sfx('flashes', 0.3); sfx('applause', 0.6, 1); } else sfx('lose'); break;
     case 'foreign': sfx('whoosh'); sfx('whoosh', 0.8); sfx('ding', 2); break;
     case 'cb': sfx('gavel'); sfx(a.ok === false ? 'lose' : 'ding', 1.2); break;
+    case 'studio': sfx('jingle'); if (a.bad) sfx('murmur', 1.2); break;
+    case 'promise': sfx('applause', 0.4); if (a.bad) sfx('murmur', 1.4); break;
+    case 'oppo': sfx('whoosh'); sfx(a.bad ? 'lose' : 'ding', 1.1); break;
+    case 'infra': [0.2, 0.42, 0.64, 0.86].slice(0, a.level).forEach(t => sfx('pop', t)); sfx('ding', 1.1); break;
     default: sfx('click');
   }
   if (res.bad && !['rally', 'money', 'social'].includes(a?.kind)) sfx('lose', 1);
@@ -460,6 +514,7 @@ export function playCinema(ctx, action, res, { onClose } = {}) {
       <div class="eyebrow">${esc(action.label)}${res.cost ? ' · ' + esc(fmtMoney(res.cost)) : ''}</div>
       <h2 class="${res.bad ? 'bad' : ''}">${esc(res.title)}</h2>
       <ul class="cine-lines">${res.lines.map((l, i) => `<li style="animation-delay:${120 + i * 140}ms">${esc(l)}</li>`).join('')}</ul>
+      ${res.fx?.length ? `<div class="fx-chips">${res.fx.map((x, i) => `<span class="fx ${(x.k === 'heat' ? -x.v : x.v) >= 0 ? 'up' : 'down'}" style="animation-delay:${150 + i * 90}ms">${esc(x.label)} <b>${esc(fmtFxValue(x.k, x.v))}</b></span>`).join('')}</div>` : ''}
       ${metricsHtml(metrics(s, action, res))}
       ${a?.kind === 'press' ? mediaWall(s, a) : ''}
       <div class="grid2"><button class="btn" data-a="close">Tamam</button>${s.player.ap > 0 ? '<button class="btn primary" data-a="more">Başka eylem</button>' : '<button class="btn primary" data-a="end">Turu bitir</button>'}</div>

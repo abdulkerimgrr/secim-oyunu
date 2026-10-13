@@ -10,6 +10,9 @@ import { bumpAll, bumpFaction } from '../engine/kurultay.js';
 import { addClusterMom } from '../engine/social.js';
 import { CLUSTERS } from '../data/clusters.js';
 import { applyPresidencyEffect } from '../engine/presidency.js';
+import { applyFx, fxPreview, fmtFxValue, segsAudience, addDirty } from '../engine/metrics.js';
+import { schedule } from '../engine/crisis.js';
+import { priceIndex } from '../engine/util.js';
 
 function eligible(state, ev) {
   const w = ev.when || {};
@@ -77,6 +80,14 @@ export function describeOption(state, opt) {
   if (e.members) out.push('Yeni üyeler');
   if (e.ballotSecurity) out.push('Sandık güvenliği artar');
   if (e.intel) out.push('İl bazında detaylı anket');
+  if (e.ap) out.push(`${e.ap} eylem puanı`);
+  if (e.cash) out.push(e.cash < 0 ? `Maliyet ${fmtMoney(-e.cash * priceIndex(state))}` : `Para +${fmtMoney(e.cash * priceIndex(state))}`);
+  if (e.fx) out.push(...fxPreview(e.fx).map(([k, v]) => `${k} ${v}`));
+  if (e.seg) out.push('Seçmen grubunda etki');
+  if (e.camp) out.push('Krizin yaşandığı ilde etki');
+  if (e.gamble) out.push(`Riskli: başarı şansı ~%${Math.round(e.gamble.chance * 100)}`);
+  if (e.schedule) out.push('İleride sonuçları olabilir');
+  if (e.dirty) out.push('⚠️ Etik dışı · yakalanma riski');
   if (e.presidency) {
     const pe = e.presidency;
     if (pe.approval) out.push(`Onay ${r(pe.approval, 1)}`);
@@ -100,6 +111,28 @@ export function resolveEvent(state, uid, optIndex, rng) {
   const c = consistency(state, opt);
   const lines = [];
   const R = a => rng.range(a[0], a[1]);
+  if (e.ap && state.player.ap < e.ap) return { error: `Bu seçenek için ${e.ap} eylem puanı gerekiyor (kalan ${state.player.ap}).` };
+  if (e.cash && e.cash < 0 && p.money < -e.cash * priceIndex(state)) return { error: 'Bu seçenek için yeterli para yok.' };
+  if (e.ap) { state.player.ap -= e.ap; lines.push(`${e.ap} eylem puanı harcandı`); }
+  if (e.cash) { const v = Math.round(e.cash * priceIndex(state)); p.money += v; lines.push(v < 0 ? `Harcama ${fmtMoney(-v)}` : `Para +${fmtMoney(v)}`); }
+  const fxLines = list => list.forEach(x => lines.push(`${x.label} ${fmtFxValue(x.k, x.v)}`));
+  if (e.fx) {
+    let m = 1;
+    if (e.econBonus) m *= (p.leader?.character?.profession === 'ekonomist' || state.player.character?.profession === 'ekonomist') ? 1.4 : 1;
+    fxLines(applyFx(state, e.fx, rng, m));
+  }
+  if (e.gamble) {
+    let ch = e.gamble.chance;
+    if (e.charisma) ch += (p.leader.image - 0.5) * 0.6 + ((p.trust ?? 50) - 50) / 200;
+    const win = rng.chance(Math.max(0.1, Math.min(0.9, ch)));
+    lines.push(win ? 'Hamle tuttu.' : '⚠️ Hamle ters tepti.');
+    fxLines(applyFx(state, win ? e.gamble.win : e.gamble.lose, rng));
+  }
+  if (e.seg) for (const [sg, v] of Object.entries(e.seg)) { addClusterMom(state, p.id, segsAudience({ [sg]: 1 }), v); lines.push('Seçmen grubunda destek arttı'); }
+  if (e.camp) { const cc = state.camp[e.camp.plate] || (state.camp[e.camp.plate] = {}); cc[p.id] = (cc[p.id] || 0) + e.camp.value; lines.push(`${PROVINCES.find(x => x.plate === +e.camp.plate)?.name || 'İl'} genelinde kampanya etkisi +${e.camp.value.toFixed(2).replace('.', ',')}`); }
+  if (e.schedule) schedule(state, e.schedule);
+  if (e.flag) state.flags[e.flag] = state.date;
+  if (e.dirty) { addDirty(state, e.dirty); lines.push('⚠️ Operasyon başladı; her hafta ortaya çıkma riski var.'); }
   if (e.momentum) { const v = R(e.momentum) * c; p.momentum += v; lines.push(`İvme ${v >= 0 ? '+' : ''}${v.toFixed(3)}`); }
   if (e.recognition) { const v = R(e.recognition); p.recognition = clamp(p.recognition + v, 0, 1); lines.push(`Tanınırlık +${pct(v, 1)}`); }
   if (e.unity) { const v = R(e.unity); p.unity = clamp(p.unity + v, 0, 100); lines.push(`İç huzur ${v >= 0 ? '+' : ''}${v.toFixed(0)}`); }

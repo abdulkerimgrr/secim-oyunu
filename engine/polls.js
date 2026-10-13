@@ -20,5 +20,5 @@ export function takePoll(state, rng) {
 }
 
 export function storeProjection(state, pr = project(state)) {
-  state.lastProjection = { national: pr.national, provinces: Object.fromEntries(Object.entries(pr.provinces).map(([k, v]) => [k, { shares: v.shares, turnout: v.turnout }])) };
+  state.lastProjection = { national: pr.national, clusters: pr.clusters, provinces: Object.fromEntries(Object.entries(pr.provinces).map(([k, v]) => [k, { shares: v.shares, turnout: v.turnout }])) };
 }
