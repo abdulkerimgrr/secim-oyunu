@@ -1,0 +1,4 @@
+{
+  "aciklama": "Oyuna gömülecek üretilmiş görsel ve videolar. Her kayıt: key (oyundaki anahtar), file (bu klasördeki dosya), prompt (üretim metni), source (openai modeli), date.",
+  "items": []
+}

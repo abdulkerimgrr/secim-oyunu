@@ -1,5 +1,6 @@
 // Eylem animasyonları: her eylem türü için kısa sahne + animasyonlu sonuç paneli.
 // Sahneye dokunmak animasyonu atlar; "hareketi azalt" ayarında doğrudan son kare gösterilir.
+import { MEDIA } from '../data/media.js';
 import { fmtFxValue } from '../engine/metrics.js';
 import { esc, el } from './dom.js';
 import { avatarSvg } from './avatar.js';
@@ -507,7 +508,10 @@ function playSound(a, res) {
 export function playCinema(ctx, action, res, { onClose } = {}) {
   const s = ctx.state;
   const a = res.anim;
-  const sc = buildScene(s, action, a);
+  let sc = buildScene(s, action, a);
+  // Üretilmiş medya varsa (tools/openai-*.mjs → data/media.js) sahneyi onunla değiştir
+  const vid = a?.kind && MEDIA['video:' + a.kind], pic = a?.kind && MEDIA['scene:' + a.kind];
+  if (vid || pic) sc = { cls: 'sc-media', ms: vid ? 3200 : 2200, html: `${vid ? `<video class="cine-media" src="${vid}" autoplay muted playsinline></video>` : `<img class="cine-media kb" src="${pic}" alt="">`}<div class="cine-cap">${esc(res.title)}</div>` };
   const o = el(`<div class="cine" role="dialog" aria-modal="true" aria-label="${esc(action.label)}">
     <div class="cine-stage ${sc.cls}" id="cstage">${sc.html}<div class="cine-skip">Atlamak için dokun</div></div>
     <div class="cine-panel" id="cpanel" hidden>

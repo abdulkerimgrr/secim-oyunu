@@ -1,3 +1,4 @@
+import { MEDIA } from '../data/media.js';
 // Katmanlı SVG portre (gölgelendirmeli). Karakter nesnesinden çizilir; eski kayıtlar için varsayılanlar vardır.
 let uid = 0;
 function shade(hex, amt) {
@@ -64,12 +65,13 @@ const NOSE = {
 export function avatarSvg(c, { size = 120, bg = '#E6EBF3', ring = null, mood = 'smile', pin, crop = null } = {}) {
   const id = 'av' + (++uid);
   // Oyuncunun yüklediği fotoğraf (yalnızca bu tarayıcıda, kayıt içinde saklanır)
-  if (c.photo && /^data:image\/(jpeg|png|webp);base64,/.test(c.photo)) {
+  const photo = c.photo || (c.portraitKey && MEDIA[c.portraitKey]) || null;
+  if (photo && /^data:image\/(jpeg|png|webp);base64,/.test(photo)) {
     const pc = pin ?? (c.pin !== false ? c.pinColor : null);
     return `<svg viewBox="0 0 120 140" width="${size}" height="${Math.round(size * 140 / 120)}" role="img" aria-label="Karakter fotoğrafı" style="display:block">
       <defs><clipPath id="${id}c"><rect width="120" height="140" rx="6"/></clipPath></defs>
       ${bg === 'transparent' ? '' : `<rect width="120" height="140" fill="${bg}"/>`}
-      <image href="${c.photo}" width="120" height="140" preserveAspectRatio="xMidYMid slice" clip-path="url(#${id}c)"/>
+      <image href="${photo}" width="120" height="140" preserveAspectRatio="xMidYMid slice" clip-path="url(#${id}c)"/>
       ${ring ? `<rect x="1.5" y="1.5" width="117" height="137" rx="6" fill="none" stroke="${ring}" stroke-width="3"/>` : ''}
       ${pc ? `<circle cx="104" cy="124" r="5" fill="${pc}" stroke="#E9D8A6" stroke-width="1.4"/>` : ''}</svg>`;
   }

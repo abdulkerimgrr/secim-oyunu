@@ -13,6 +13,7 @@ import { audioSettingsHtml, bindAudioSettings } from '../audioSettings.js';
 import { fmtDate, pct } from '../../engine/util.js';
 import { LOOKS, PROFESSIONS, EDUCATION, TRAITS, ARCHETYPES, archetypeLook, randomCharacter } from '../../data/character.js';
 import { charStats } from '../../engine/character.js';
+import { MEDIA } from '../../data/media.js';
 import { PROVINCES } from '../../data/generated/provinces.js';
 import { avatarSvg } from '../avatar.js';
 import { mixColor } from '../map.js';
@@ -207,7 +208,7 @@ function characterStep() {
   const archCards = ARCHETYPES.map(a => {
     const look = archetypeLook(a);
     return `<button type="button" class="cc-arch ${c.archetype === a.id ? 'on' : ''}" data-arch="${a.id}">
-      ${sceneSvg('ar' + a.id)}<div class="cc-arch-p">${avatarSvg({ ...look, pinColor: pinColor() }, { size: 150, bg: 'transparent', pin: look.pin === false ? null : pinColor() })}</div>
+      ${MEDIA['archetype:' + a.id] ? `<img class="cc-arch-img" src="${MEDIA['archetype:' + a.id]}" alt="">` : `${sceneSvg('ar' + a.id)}<div class="cc-arch-p">${avatarSvg({ ...look, pinColor: pinColor() }, { size: 150, bg: 'transparent', pin: look.pin === false ? null : pinColor() })}</div>`}
       <div class="cc-arch-t"><b>${esc(a.title.toLocaleUpperCase('tr'))}</b><span>${esc(a.tagline)}</span><i>${a.icon}</i></div></button>`;
   }).join('') + `<label class="cc-arch photo ${c.photo ? 'on' : ''}"><div class="cc-arch-t" style="position:static;background:none"><i style="font-size:34px">📷</i><b>KENDİ FOTOĞRAFIN</b><span>Yalnızca bu cihazda saklanır.</span></div><input type="file" id="f-photo" accept="image/*" hidden></label>`;
 
@@ -280,7 +281,7 @@ function bindCharacter(view, ctx, go) {
   const preview = () => { const el = view.querySelector('#char-preview'); if (el) el.innerHTML = avatarSvg(c, { size: 300, bg: 'transparent', pin: c.pin !== false ? pinColor() : null }); };
   view.querySelector('#f-player').addEventListener('input', e => { w.playerName = e.target.value.trim(); });
   view.querySelector('#f-age').addEventListener('input', e => { c.age = +e.target.value; view.querySelector('#age-l').textContent = c.age; preview(); });
-  view.querySelector('#f-age').addEventListener('change', rerender);
+  view.querySelector('#f-age').addEventListener('change', () => { delete c.portraitKey; rerender(); });
   view.querySelector('#f-home')?.addEventListener('change', e => { c.hometown = +e.target.value; });
   view.querySelector('#f-pin')?.addEventListener('change', e => { c.pin = e.target.checked; rerender(); });
   view.querySelectorAll('[data-ctab]').forEach(b => b.onclick = () => { w.charTab = b.dataset.ctab; rerender(); });
@@ -288,12 +289,14 @@ function bindCharacter(view, ctx, go) {
     const a = ARCHETYPES.find(x => x.id === b.dataset.arch);
     Object.assign(c, archetypeLook(a), { profession: a.profession, education: a.education, traits: [...a.traits], archetype: a.id });
     delete c.photo;
+    if (MEDIA['archetype:' + a.id]) c.portraitKey = 'archetype:' + a.id; else delete c.portraitKey;
     sfx('click');
     rerender();
   });
   view.querySelectorAll('[data-ch]').forEach(b => b.onclick = () => {
     const key = b.dataset.ch, v = b.dataset.v;
     c[key] = v;
+    if (!['education', 'profession'].includes(key)) delete c.portraitKey; // görünüm değişti: hazır fotoğraf yerine çizim
     if (key === 'gender') {
       const styles = LOOKS.hairStyle[v].map(h => h[0]);
       if (!styles.includes(c.hairStyle)) c.hairStyle = styles[0];

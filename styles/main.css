@@ -787,3 +787,11 @@ main.view:has(> .cc) { padding-bottom: 0; }
 .mmbar { height: 6px; background: var(--muted); border-radius: 3px; overflow: hidden; } .mmbar i { display: block; height: 100%; }
 @media (max-width: 420px) { .mini-meters { grid-template-columns: repeat(2, 1fr); } }
 .mini-link { display: block; width: 100%; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; color: inherit; font: inherit; }
+/* Üretilmiş medya */
+.cc-arch-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.sc-media { position: relative; overflow: hidden; background: #000; }
+.cine-media { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.cine-media.kb { animation: kb 3s ease-out both; }
+@keyframes kb { from { transform: scale(1.12); } to { transform: scale(1); } }
+.cine-cap { position: absolute; left: 12px; right: 12px; bottom: 12px; color: #fff; font: 700 20px/1.1 var(--f-display); text-shadow: 0 2px 10px rgba(0,0,0,.8); }
+@media (prefers-reduced-motion: reduce) { .cine-media.kb { animation: none; } }
