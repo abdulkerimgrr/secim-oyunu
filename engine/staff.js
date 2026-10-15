@@ -55,11 +55,11 @@ export function hire(state, cand) {
   state.staff[cand.role] = { ...cand, since: state.date };
   const party = state.parties[state.player.partyId];
   party.money -= cand.salary * priceIndex(state); // ilk hafta peşin
-  if (cand.role === 'asistan' && cand.level >= 0.45) state.player.apMax = (state.player.apMaxBase ?? state.player.apMax) + 1;
+  if (cand.role === 'asistan' && cand.level >= 0.45) state.player.apMax = (state.player.apMaxBase ?? state.player.apMax) + 2;
 }
 
 export function fire(state, role) {
   if (!state.staff?.[role]) return;
-  if (role === 'asistan' && state.staff[role].level >= 0.45) state.player.apMax = Math.max(3, state.player.apMax - 1);
+  if (role === 'asistan' && state.staff[role].level >= 0.45) state.player.apMax = Math.max(6, state.player.apMax - 2);
   delete state.staff[role];
 }

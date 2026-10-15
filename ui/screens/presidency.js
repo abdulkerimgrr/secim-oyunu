@@ -32,7 +32,7 @@ export function renderPresidency(view, ctx) {
   const seats = s.government.reduce((a, id) => a + (s.parliament.seats[id] || 0), 0);
   const termDays = daysBetween(s.date, s.nextElection);
   view.insertAdjacentHTML('beforeend', `<section class="card makam">
-    <div class="makam-head"><div class="seal">☾★</div><div><div class="eyebrow" style="color:var(--hi)">Türkiye Cumhuriyeti</div><h2 style="color:#fff;margin:0">Cumhurbaşkanlığı</h2><div class="small" style="opacity:.8">${fmtDate(p.since || s.date)} tarihinden beri · seçime ${Math.ceil(termDays / 7)} hafta</div></div>
+    <div class="makam-head"><div class="seal">☾★</div><div><div class="eyebrow" style="color:var(--hi)">Türkiye Cumhuriyeti</div><h2 style="color:#fff;margin:0">Cumhurbaşkanlığı</h2><div class="small" style="opacity:.8">${fmtDate(p.since || s.date)} tarihinden beri · seçime ${termDays > 70 ? Math.round(termDays / 30.4) + ' ay' : Math.ceil(termDays / 7) + ' hafta'}</div></div>
       <div class="portrait" style="margin-left:auto">${avatarSvg(s.player.character, { size: 64, bg: mixColor('#FFFFFF', me.color, 0.25) })}</div></div>
     ${gauge(p.approval)}
     <p class="small muted" style="text-align:center;margin:0">Eğilim: ${tgt > p.approval + 1 ? '▲ yükseliyor' : tgt < p.approval - 1 ? '▼ düşüyor' : '● sabit'} · Onay; ekonomi, dış ilişkiler, partinin anketi ve kabineye bağlıdır.</p>

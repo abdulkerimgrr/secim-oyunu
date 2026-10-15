@@ -26,5 +26,5 @@ export const RULES = {
     annualTotal2023: 1_505_000_000,
     electionYearMultiplier: 3,
   },
-  campaignDays: 28,             // Oyun tasarımı: son 28 gün günlük tur (yasal kampanya süresi değil)
+  campaignDays: 56,             // Oyun tasarımı: son 8 hafta haftalık tur (yasal kampanya süresi değil); öncesi aylık tur
 };

@@ -140,7 +140,7 @@ function statusCard(s) {
       <div class="kfac">${k.factions.map(f => `<div class="kf"><div class="row" style="justify-content:space-between"><span class="small" style="font-weight:600">${esc(f.label)}</span><span class="small muted num">ağırlık %${Math.round(f.weight * 100)} · <b style="color:var(--ink)">%${Math.round(f.support)}</b></span></div><div class="kfbar"><div style="width:${f.support}%"></div></div></div>`).join('')}</div>
       <div class="ksig ${sigOk ? 'ok' : ''}"><div class="row" style="justify-content:space-between"><span class="small"><b>Adaylık imzası</b> ${sigOk ? '✓' : `· son ${sigWeeks} hafta (${fmtDate(k.sigDeadline)})`}</span><span class="small num"><b>%${k.signatures.toFixed(1).replace('.', ',')}</b> / %${Math.round(k.sigNeed * 100)}</span></div>
         <div class="kfbar"><div style="width:${Math.min(100, k.signatures / (k.sigNeed * 100) * 100)}%;background:${sigOk ? 'var(--good)' : 'var(--warn)'}"></div></div></div>
-      <p class="small muted" style="margin:8px 0 0">Kazanmak için ilk turda %50'nin üzeri gerekir; olmazsa ikinci tura kalınır. Genel merkez her hafta desteğini geri çekmeye çalışır.</p></section>`;
+      <p class="small muted" style="margin:8px 0 0">Kazanmak için ilk turda %50'nin üzeri gerekir; olmazsa ikinci tura kalınır. Genel merkez her ay desteğini geri çekmeye çalışır.</p></section>`;
   }
   const el = s.player.mode === 'found' ? eligibility(s) : null;
   return `<section class="card"><div class="row" style="flex-wrap:nowrap;align-items:flex-start">${portrait(s, 64)}<div style="flex:1;min-width:0"><div class="row" style="gap:6px">${partyBadge(me)}<span class="eyebrow" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(me.name)}</span></div>
@@ -158,7 +158,7 @@ function calendar(s) {
   const items = [];
   if (s.player.mode === 'join' && !s.player.isLeader) items.push([s.player.kurultay.date, `${playerParty(s).short} kurultayı`, 'Kurultay']);
   if (s.localElection) items.push([s.localElection, `${s.localElection.slice(0, 4)} Yerel seçimler (basitleştirilmiş)`, 'Seçim']);
-  items.push([addDays(s.nextElection, -s.rules.campaignDays), 'Seçim kampanyası başlar (günlük tur)', 'Takvim']);
+  items.push([addDays(s.nextElection, -s.rules.campaignDays), 'Seçim kampanyası başlar (haftalık tur)', 'Takvim']);
   items.push([s.nextElection, 'Milletvekili genel seçimi', 'Seçim']);
   if (s.player.mode === 'found') items.push([addDays(s.nextElection, -s.rules.partyEligibility.congressMonthsBefore * 30), 'Büyük kongre için son tarih', 'Yasal']);
   const m = s.date.slice(5, 7);

@@ -138,14 +138,15 @@ function topbar(s) {
   const me = playerParty(s);
   const pre = s.player.mode === 'join' && !s.player.isLeader;
   const money = pre ? s.player.personalMoney : me.money;
-  const pips = Array.from({ length: s.player.apMax > 5 ? s.player.apMax : (s.phase === 'campaign' ? 3 : s.player.apMax) }, (_, i) => `<i class="${i < s.player.ap ? 'on' : ''}"></i>`).join('');
+  const apMaxNow = s.phase === 'campaign' ? Math.max(s.player.ap, 8) : Math.max(s.player.ap, s.player.apMax);
+  const pips = `<span class="ap-bar"><i style="width:${Math.round(100 * s.player.ap / apMaxNow)}%"></i></span>`;
   const days = daysBetween(s.date, s.nextElection);
   const av = s.player.character ? `<div class="topav">${avatarSvg(s.player.character, { size: 36, bg: mixColor('#FFFFFF', me.color, 0.3) })}</div>` : '';
   return `<header class="topbar">${av}
-    <div class="tb-main"><div class="date num">${fmtDate(s.date)}</div><div class="sub">${s.phase === 'campaign' ? `Seçime ${days} gün` : `Seçime ${Math.ceil(days / 7)} hf`} · ${esc(fmtMoneyShort(money))}</div></div>
-    <div title="Eylem puanı"><div class="ap">${pips}</div><div class="sub" style="text-align:right">${s.player.ap} puan</div></div>
+    <div class="tb-main"><div class="date num">${fmtDate(s.date)}</div><div class="sub">${s.phase === 'campaign' ? `Seçime ${days} gün` : days > 70 ? `Seçime ${Math.round(days / 30.4)} ay` : `Seçime ${Math.ceil(days / 7)} hf`} · ${esc(fmtMoneyShort(money))}</div></div>
+    <div title="Eylem puanı"><div class="ap">${pips}</div><div class="sub" style="text-align:right">${s.player.ap}/${apMaxNow} puan</div></div>
     ${soundToggleHtml()}
-    <button class="btn-end" id="btn-end">${s.phase === 'campaign' ? 'Günü bitir' : 'Bitir ▸'}</button>
+    <button class="btn-end" id="btn-end">${s.phase === 'campaign' ? 'Haftayı bitir' : 'Ayı bitir ▸'}</button>
   </header>`;
 }
 

@@ -3,7 +3,7 @@
 import { CLUSTERS, TOPICS } from '../data/clusters.js';
 import { SKILLS } from '../data/founders.js';
 import { PROVINCES } from '../data/generated/provinces.js';
-import { DIFFICULTY } from './params.js';
+import { DIFFICULTY, turnEffect } from './params.js';
 import { ideologyDistance } from './model.js';
 import { clamp, addDays, fmtMoney, pct, fmtInt, loc, priceIndex, daysBetween } from './util.js';
 import { PROVINCE_BY_PLATE, playerParty } from './state.js';
@@ -47,7 +47,7 @@ export function skill(state, s) {
   return fs.length ? Math.max(...fs.map(f => f.level)) : 0;
 }
 
-export function diff(state) { return DIFFICULTY[state.difficulty] || DIFFICULTY.zor; }
+export function diff(state) { const d = DIFFICULTY[state.difficulty] || DIFFICULTY.zor; return { ...d, effect: d.effect * turnEffect(state) }; }
 
 // Tekrar cezası: aynı eylem türü ve aynı il arka arkaya kullanıldıkça etki düşer
 export function fatigue(state, type, plate) {
@@ -145,7 +145,7 @@ export const ACTIONS = [
       const name = PROVINCE_BY_PLATE[prm.province].name;
       return { title: `${name} delegeleriyle görüştün`, lines: [`Toplam delege desteği ${fmtSigned(k.support - before)} puan`, isHometown(state, prm.province) ? 'Memleketinde hemşehrilerin seni bağrına bastı.' : 'En çok il ve ilçe başkanları etkilendi.'] , anim: { kind: 'delegates', change: k.support - before, support: k.support, province: name, color: playerParty(state).color } };
     } },
-  { id: 'vision', cat: 'Kurultay', icon: '🎙️', label: 'Vizyon konuşması (canlı yayın)', ap: 1, preKurultay: true,
+  { id: 'vision', limitPerTurn: 2, cat: 'Kurultay', icon: '🎙️', label: 'Vizyon konuşması (canlı yayın)', ap: 1, preKurultay: true,
     desc: 'Canlı yayında sunucunun üç sorusunu cevapla. Her cevap hiziplerin delege oyunu anlık değiştirir.', cost: () => 0, personal: true,
     estimate() { return { live: true }; },
     run(state, prm, rng) {
@@ -197,7 +197,7 @@ export const ACTIONS = [
       const f = fatigue(state, 'rally', province);
       const home = isHometown(state, province) ? 1.4 : 1;
       const weather = weatherFor(state, province, info.region);
-      const clash = (state.flags.rivalRallies || []).filter(r => r.plate === +province && daysBetween(r.date, state.date) <= 7).map(r => state.parties[r.party]?.short).filter(Boolean);
+      const clash = (state.flags.rivalRallies || []).filter(r => r.plate === +province && daysBetween(r.date, state.date) <= (state.phase === 'campaign' ? 7 : 30)).map(r => state.parties[r.party]?.short).filter(Boolean);
       const clashM = clash.length ? 0.78 : 1;
       const wM = v.open ? weather.mult : 1;
       const camp = 0.12 * diff(state).effect * quality * fit * toneM * f * charMod(state, 'rally') * home * v.effect * clashM;
@@ -229,7 +229,7 @@ export const ACTIONS = [
       lines.push(`${e.venue.label} · katılım yaklaşık ${fmtInt(Math.max(crowd, 100))} kişi (doluluk %${Math.round(Math.min(1.15, fill) * 100)})`);
       lines.push(`İl kampanya etkisi +${camp.toFixed(2).replace('.', ',')}`, `Tanınırlık +${pct(rec, 2)}`);
       if (e.weather && e.weather.mult < 1) lines.push(`${e.weather.icon} ${e.weather.label} hava katılımı düşürdü.`);
-      if (e.clash.length) lines.push(`Aynı hafta ${e.clash[0]} da bu ilde miting yaptı; ilgi bölündü.`);
+      if (e.clash.length) lines.push(`Bu dönemde ${e.clash[0]} da bu ilde miting yaptı; ilgi bölündü.`);
       if (e.fit > 1.1) lines.push('Konuşman bu ilin seçmenine çok iyi oturdu.');
       else if (e.fit < 0.8) lines.push('Konuşman bu ilde pek karşılık bulmadı.');
       let gaffe = false, transport = false;
@@ -274,7 +274,7 @@ export const ACTIONS = [
   ...EXTRA_ACTIONS.saha,
 
   // --- Medya ---
-  { id: 'tv', cat: 'Medya', icon: '📺', label: 'Canlı TV programı (soru-cevap)', ap: 1, params: ['channel'], fx: { visibility: [4, 7] },
+  { id: 'tv', limitPerTurn: 3, cat: 'Medya', icon: '📺', label: 'Canlı TV programı (soru-cevap)', ap: 1, params: ['channel'], fx: { visibility: [4, 7] },
     desc: 'Kanalın çizgisi önemli: dost kanalda mesaj rahat geçer ama yeni seçmen az; karşıt kanalda sorular serttir.',
     cost: () => 0,
     available(state, { channel } = {}) {
@@ -302,7 +302,7 @@ export const ACTIONS = [
   { id: 'debate', cat: 'Medya', icon: '🎤', label: 'Liderler tartışması (canlı)', ap: 2, cost: () => 0,
     desc: 'Seçim kampanyasında bir kez: en güçlü iki rakip parti lideriyle ortak canlı yayın. Kazanan anketlerde sıçrar.',
     available(state) {
-      if (state.phase !== 'campaign') return 'Yalnızca seçim kampanyası döneminde (son 28 gün) yapılır.';
+      if (state.phase !== 'campaign') return 'Yalnızca seçim kampanyası döneminde (son 8 hafta) yapılır.';
       if (state.flags.debateDone === state.nextElection) return 'Bu seçim için tartışma yapıldı.';
       return true;
     },
@@ -370,7 +370,7 @@ export const ACTIONS = [
   ...EXTRA_ACTIONS.rakip,
 
   // --- Diplomasi ---
-  { id: 'polvisit', cat: 'Diplomasi', icon: '🤝', label: 'Siyasi ziyaret', ap: 1, params: ['target'],
+  { id: 'polvisit', limitPerTurn: 2, cat: 'Diplomasi', icon: '🤝', label: 'Siyasi ziyaret', ap: 1, params: ['target'],
     desc: 'Bir parti genel başkanını ya da Cumhurbaşkanını ziyaret et. İlişkiler ittifak ihtimalini artırır, rakip saldırılarını yumuşatır.',
     cost: () => 30000,
     available(state, { target } = {}) { if (target && target !== 'cb' && !state.parties[target]) return 'Geçersiz hedef.'; return true; },
@@ -383,7 +383,7 @@ export const ACTIONS = [
       return { title: r.ok ? `${r.host} ile görüşme` : 'Ziyaret gerçekleşmedi', bad: !r.ok, lines,
         anim: { kind: 'polvisit', ok: r.ok, mood: r.mood, host: r.host, hostColor: t?.color || '#C8102E', hostShort: t?.short || 'TC', color: playerParty(state).color } };
     } },
-  { id: 'foreign', cat: 'Diplomasi', icon: '✈️', label: 'Dış temas', ap: 2, params: ['destination'],
+  { id: 'foreign', limitPerTurn: 1, cat: 'Diplomasi', icon: '✈️', label: 'Dış temas', ap: 2, params: ['destination'],
     desc: 'Yurt dışı temasları uluslararası itibarını artırır. Her başkentin seçmen kümelerinde karşılığı farklıdır.',
     cost: () => 400000,
     estimate(state, { destination = 'bruksel' }) {
@@ -401,7 +401,7 @@ export const ACTIONS = [
     } },
 
   // --- Cumhurbaşkanlığı (yalnızca cumhurbaşkanıyken) ---
-  { id: 'cbEconomy', cat: 'Cumhurbaşkanlığı', icon: '🏦', label: 'Ekonomi yönetimi: para politikası', ap: 1, presidentOnly: true, params: ['econStance'], cost: () => 0,
+  { id: 'cbEconomy', limitPerTurn: 1, cat: 'Cumhurbaşkanlığı', icon: '🏦', label: 'Ekonomi yönetimi: para politikası', ap: 1, presidentOnly: true, params: ['econStance'], cost: () => 0,
     desc: 'Merkez Bankası\'na yaklaşımını belirle. Sıkı politika enflasyonu düşürür ama büyümeyi yavaşlatır; gevşek politika tersini yapar.',
     estimate(state, { econStance = 'dengeli' }) { return { econNote: { siki: 'Enflasyon hedefi düşer, büyüme ve onay biraz azalır', dengeli: 'Mevcut gidişat korunur', gevsek: 'Büyüme artar; enflasyon ve kur yükselir' }[econStance] }; },
     run(state, prm) {
@@ -411,7 +411,7 @@ export const ACTIONS = [
       addNews(state, 'gov', `Cumhurbaşkanlığı ekonomi yönetiminde ${{ siki: 'sıkı', dengeli: 'dengeli', gevsek: 'gevşek' }[p.econStance]} para politikasına geçildiğini açıkladı`);
       return { title: 'Ekonomi programı güncellendi', lines: [`Para politikası: ${{ siki: 'Sıkı', dengeli: 'Dengeli', gevsek: 'Gevşek' }[p.econStance]}`, 'Merkez Bankası her ay bu yaklaşıma göre faiz kararı verecek.'], anim: { kind: 'cb', icon: '🏦', label: 'Ekonomi programı' } };
     } },
-  { id: 'cbLaw', cat: 'Cumhurbaşkanlığı', icon: '📜', label: 'Kanun teklifi gönder', ap: 2, presidentOnly: true, params: ['policy'], cost: () => 0,
+  { id: 'cbLaw', limitPerTurn: 2, cat: 'Cumhurbaşkanlığı', icon: '📜', label: 'Kanun teklifi gönder', ap: 2, presidentOnly: true, params: ['policy'], cost: () => 0,
     desc: 'Meclis\'e kanun teklifi gönder. Geçmesi için ittifakının sandalye çoğunluğu gerekir; kamuoyu desteği onay oranını etkiler.',
     estimate(state, { policy }) {
       const pol = policyById(policy) || lawOptions(state)[0];
@@ -425,7 +425,7 @@ export const ACTIONS = [
         lines: [`Meclis'te ittifak sandalyesi: ${r.seats} (gereken ${r.need})`, `Kamuoyu desteği: %${Math.round(r.support * 100)}`, ...(r.passes ? [`Onay oranı ${r.approvalDelta >= 0 ? '+' : ''}${r.approvalDelta.toFixed(1).replace('.', ',')}`] : ['Onay oranı −2'])],
         anim: { kind: 'cb', icon: '📜', label: pol.title, ok: r.passes } };
     } },
-  { id: 'cbWage', cat: 'Cumhurbaşkanlığı', icon: '💵', label: 'Asgari ücret kararı', ap: 1, presidentOnly: true, params: ['wage'], cost: () => 0,
+  { id: 'cbWage', limitPerTurn: 1, cat: 'Cumhurbaşkanlığı', icon: '💵', label: 'Asgari ücret kararı', ap: 1, presidentOnly: true, params: ['wage'], cost: () => 0,
     desc: 'Yılda bir kez asgari ücret artışını belirle. Yüksek artış onay getirir ama enflasyonu körükler.',
     available(state) { return state.presidency?.wageYear === state.date.slice(0, 4) ? 'Bu yıl asgari ücret belirlendi.' : true; },
     estimate(state, { wage = 40 }) { return { econNote: `Enflasyona etkisi yaklaşık +${((wage - 30) * 0.08).toFixed(1).replace('.', ',')} puan` }; },
@@ -433,14 +433,14 @@ export const ACTIONS = [
       const r = setMinimumWage(state, prm.wage || 40, rng);
       return { title: `Asgari ücrete %${prm.wage || 40} zam`, lines: [`Onay oranı ${r.approvalDelta >= 0 ? '+' : ''}${r.approvalDelta.toFixed(1).replace('.', ',')}`, `Enflasyon etkisi +${r.infl.toFixed(1).replace('.', ',')} puan`], anim: { kind: 'cb', icon: '💵', label: 'Asgari ücret' } };
     } },
-  { id: 'cbSummit', cat: 'Cumhurbaşkanlığı', icon: '🛬', label: 'Resmi ziyaret ve zirve', ap: 2, presidentOnly: true, params: ['destination'], cost: () => 0,
+  { id: 'cbSummit', limitPerTurn: 1, cat: 'Cumhurbaşkanlığı', icon: '🛬', label: 'Resmi ziyaret ve zirve', ap: 2, presidentOnly: true, params: ['destination'], cost: () => 0,
     desc: 'Devlet başkanı olarak resmi ziyaret. Dış ilişkileri doğrudan iyileştirir; Dışişleri Bakanının yetkinliği önemlidir.',
     estimate() { return { econNote: 'İlgili dış ilişki puanı +2 … +8' }; },
     run(state, prm, rng) {
       const r = summit(state, prm.destination || 'bruksel', rng);
       return { title: `${r.dest.city} resmi ziyareti`, bad: !r.ok, lines: [r.ok ? 'Anlaşmalar imzalandı; ilişkiler güçlendi.' : 'Ziyaret beklenen sonucu vermedi.'], anim: { kind: 'foreign', dest: r.dest.id, city: r.dest.city, icon: r.dest.icon, ok: r.ok, color: playerParty(state).color } };
     } },
-  { id: 'cbAddress', cat: 'Cumhurbaşkanlığı', icon: '🇹🇷', label: 'Ulusa sesleniş', ap: 1, presidentOnly: true, params: ['topic'], cost: () => 0,
+  { id: 'cbAddress', limitPerTurn: 1, cat: 'Cumhurbaşkanlığı', icon: '🇹🇷', label: 'Ulusa sesleniş', ap: 1, presidentOnly: true, params: ['topic'], cost: () => 0,
     desc: 'Tüm kanallardan canlı yayınla ulusa seslen. Onay oranını yükseltir; sık yapılırsa etkisi azalır.',
     estimate() { return { econNote: 'Onay +0,5 … +3,5 (6 haftada birden sık yapılırsa azalır)' }; },
     run(state, prm, rng) {
@@ -523,7 +523,7 @@ export const ACTIONS = [
       p.orgs[prm.province] = clamp((p.orgs[prm.province] || 0) + g, 0, 1);
       return { title: `${PROVINCE_BY_PLATE[prm.province].name} teşkilatı güçlendi`, lines: [`Teşkilat gücü ${pct(e.current, 0)} → ${pct(p.orgs[prm.province], 0)}`] , anim: { kind: 'strengthen', from: e.current, to: p.orgs[prm.province], province: PROVINCE_BY_PLATE[prm.province].name, color: p.color } };
     } },
-  { id: 'members', cat: 'Teşkilat', icon: '🪪', label: 'Üye kampanyası', ap: 1, fx: { morale: [1, 2] }, desc: 'Yeni üyeler aidat geliri ve gönüllü demektir.',
+  { id: 'members', limitPerTurn: 2, cat: 'Teşkilat', icon: '🪪', label: 'Üye kampanyası', ap: 1, fx: { morale: [1, 2] }, desc: 'Yeni üyeler aidat geliri ve gönüllü demektir.',
     cost: () => 80000,
     estimate(state) {
       const p = playerParty(state);
@@ -539,7 +539,7 @@ export const ACTIONS = [
       p.members += m; bumpFatigue(state, 'members');
       return { title: 'Üye kampanyası', lines: [`${fmtInt(m)} yeni üye`] , anim: { kind: 'members', count: m, total: p.members, color: p.color } };
     } },
-  { id: 'fundraise', cat: 'Teşkilat', icon: '💰', label: 'Bağış kampanyası', ap: 1, params: ['choice:fund'],
+  { id: 'fundraise', limitPerTurn: 3, cat: 'Teşkilat', icon: '💰', label: 'Bağış kampanyası', ap: 1, params: ['choice:fund'],
     desc: 'Küçük bağış kampanyası, büyük bağışçı toplantısı ya da online kitle fonlaması. Büyük bağışçılar ileride karşılık isteyebilir.',
     choices(state) {
       const burned = state.flags.donorBurned && addDays(state.flags.donorBurned, 182) > state.date;
@@ -573,7 +573,7 @@ export const ACTIONS = [
       }
       return { title: 'Bağış kampanyası', bad, lines , anim: { kind: 'money', amount: m, bad, color: p.color } };
     } },
-  { id: 'congress', cat: 'Teşkilat', icon: '🏛️', label: 'Büyük kongre düzenle', ap: 3, foundOnly: true,
+  { id: 'congress', limitPerTurn: 1, cat: 'Teşkilat', icon: '🏛️', label: 'Büyük kongre düzenle', ap: 3, foundOnly: true,
     desc: 'Seçime katılabilmek için seçimden en az 6 ay önce büyük kongre yapılmış olmalı (en az 20 il teşkilatı gerekir — oyun kuralı).',
     cost: () => 1_200_000,
     available(state) {
@@ -594,14 +594,14 @@ export const ACTIONS = [
     } },
 
   // --- Parti içi ---
-  { id: 'meeting', cat: 'Parti içi', icon: '🗣️', label: 'Parti içi toplantı', ap: 1, fx: { morale: [2, 4] }, desc: 'MYK ve il başkanlarıyla toplantı. İç huzuru ve teşkilat moralini artırır.',
+  { id: 'meeting', limitPerTurn: 2, cat: 'Parti içi', icon: '🗣️', label: 'Parti içi toplantı', ap: 1, fx: { morale: [2, 4] }, desc: 'MYK ve il başkanlarıyla toplantı. İç huzuru ve teşkilat moralini artırır.',
     cost: () => 20000, estimate() { return { unity: [3, 8] }; },
     run(state, prm, rng) {
       const p = playerParty(state), u = rng.range(3, 8);
       p.unity = clamp(p.unity + u, 0, 100);
       return { title: 'Parti içi toplantı', lines: [`İç huzur +${u.toFixed(0)}`] , anim: { kind: 'meeting', color: p.color } };
     } },
-  { id: 'training', cat: 'Parti içi', icon: '🎓', label: 'Kadro eğitimi', ap: 1, desc: '8 hafta boyunca gaf riskini yarıya indirir; soru-cevap provası.',
+  { id: 'training', limitPerTurn: 1, cat: 'Parti içi', icon: '🎓', label: 'Kadro eğitimi', ap: 1, desc: '8 hafta boyunca gaf riskini yarıya indirir; soru-cevap provası.',
     cost: () => 250000, estimate() { return { weeks: 8 }; },
     run(state) {
       state.flags.trainedUntil = addDays(state.date, 56);
@@ -636,6 +636,8 @@ export function canRun(state, action, prm = {}) {
   prm = withDefaults(state, action, prm);
   const ap = apOf(action, prm);
   if (state.player.ap < ap) return `Yeterli eylem puanı yok (${ap} gerekli).`;
+  const lim = action.limitPerTurn;
+  if (lim && (state.player.used?.[action.id] || 0) >= lim) return lim === 1 ? 'Bu eylem bu tur zaten yapıldı; gelecek tur tekrar yapılabilir.' : `Bu eylem bir turda en fazla ${lim} kez yapılabilir.`;
   if (action.choices) {
     for (const [k, list] of Object.entries(action.choices(state, prm))) {
       const c = list.find(x => x.id === prm[k]);
@@ -658,6 +660,7 @@ export function runAction(state, action, prm, rng) {
   if (action.personal) state.player.personalMoney -= cost; else playerParty(state).money -= cost;
   state.stats.moneySpent += cost;
   state.player.ap -= apOf(action, prm);
+  (state.player.used ||= {})[action.id] = (state.player.used[action.id] || 0) + 1;
   ensureMetrics(state);
   const res = action.run(state, prm, rng);
   res.cost = cost;
@@ -713,7 +716,7 @@ export function describeEstimate(state, action, prm) {
   if (e.crowd) out.push(['Beklenen katılım', `~${fmtInt(Math.max(100, e.crowd))} kişi${e.capacity ? ` / kapasite ${fmtInt(e.capacity)}` : ''}`]);
   if (e.fill !== undefined) out.push(['Tahmini doluluk', e.fill < 0.3 ? `%${Math.round(e.fill * 100)} · boş kalma riski!` : e.fill > 0.9 ? `%${Math.round(Math.min(1.15, e.fill) * 100)} · dolup taşar` : `%${Math.round(e.fill * 100)}`]);
   if (e.weather) out.push(['Hava', `${e.weather.icon} ${e.weather.label}${e.weather.mult < 1 ? ' (katılım düşer)' : ''}`]);
-  if (e.clash?.length) out.push(['Çakışma', `Son 7 günde burada ${e.clash.join(', ')} mitingi var (ilgi −%22)`]);
+  if (e.clash?.length) out.push(['Çakışma', `Bu dönemde burada ${e.clash.join(', ')} mitingi var (ilgi −%22)`]);
   if (e.transportRisk) out.push(['Taşıma haberi riski', pct(e.transportRisk, 0)]);
   if (e.fit) out.push(['Konu uyumu', e.fit > 1.05 ? 'Yüksek' : e.fit < 0.85 ? 'Düşük' : 'Orta']);
   if (e.risk) out.push(['Gaf / risk', pct(e.risk, 0)]);

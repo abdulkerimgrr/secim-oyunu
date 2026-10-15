@@ -75,7 +75,7 @@ export function presidencyTick(state, rng, f) {
     if (p.history.length > 72) p.history.shift();
   }
   // Onay oranı hedefe yaklaşır
-  p.approval = clamp(p.approval + (approvalTarget(state) - p.approval) * 0.08 * f + rng.normal(0, 0.4) * f, 5, 95);
+  p.approval = clamp(p.approval + (approvalTarget(state) - p.approval) * 0.08 * f + rng.normal(0, 0.4) * Math.sqrt(f), 5, 95);
   // Düşük onayda iç huzur ve kabine sadakati
   if (p.approval < 30) state.parties[state.player.partyId].unity = clamp(state.parties[state.player.partyId].unity - 0.5 * f, 0, 100);
   presidencyEvents(state, rng, f);
@@ -272,7 +272,7 @@ export function presidencyEvents(state, rng, f) {
   }
   if (state.events.active.some(e => e.presidency)) return;
   if (p.lastCrisis && addDays(p.lastCrisis, 42) > state.date) return;
-  const chance = (0.1 + (p.approval < 40 ? 0.04 : 0)) * f;
+  const chance = (0.05 + (p.approval < 40 ? 0.02 : 0)) * f;
   if (!rng.chance(chance)) return;
   p.lastCrisis = state.date;
   state.events.active.push(crisisEvent(state, rng));

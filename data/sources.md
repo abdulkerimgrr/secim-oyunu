@@ -74,3 +74,6 @@ Bakan istifaları, skandallar ve kabine krizleri kurgusal senaryolardır. Meclis
 - **Sandığa taşıma**: seçim günü partilerin oyları il teşkilatı gücü (±%5), oyuncu için ayrıca seçim altyapısı ve moral ile çarpılır. Anketler bu farkı içermez. Katsayılar **tasarım**.
 - **Krizler ve zincirleme olaylar** (`data/crises.js`): tümü kurgusal oyun içi senaryodur; gerçek kişiler hakkında iddia içermez.
 - **Etik dışı seçenekler** (bot ağı, dezenformasyon, etiketsiz influencer reklamı, bilgi sızdırma, sahte video teklifi): oyuncunun kendi riskli tercihi olarak modellenir; sonuç metinleri soyuttur, gerçek parti veya kişiler hakkında uydurma içerik üretilmez. Yakalanma olasılıkları tasarımdır.
+
+## Tur uzunluğu (tasarım)
+Normal dönemde her tur 1 aydır (12 eylem puanı); seçimden önceki son 8 hafta kampanya dönemidir ve her tur 1 haftadır (8 eylem puanı). Eylem etkileri, turda yapılan eylem sayısı azaldığı için ölçeklenmiştir (normal ×1,7, kampanya ×1,35; canlı yayınlar hariç). Bazı eylemlerin tur başına sınırı vardır. Denge, haftalık sürümle aynı kurultay ve seçim sonuçlarını verecek şekilde simülasyonla ayarlanmıştır.

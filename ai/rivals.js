@@ -20,7 +20,7 @@ export function rivalsAct(state, rng, scale = 1) {
   const misery = state.economy.inflation + 2 * state.economy.unemployment - state.economy.misery0;
   const prov = state.lastProjection?.provinces || {};
   const hotProvs = state.flags.lastPlayerProvs || [];
-  let newsBudget = 3;
+  let newsBudget = Math.round(3 * Math.min(2.5, Math.max(1, scale)));
 
   for (const p of Object.values(state.parties)) {
     if (p.dissolved || p.aggregate || (p.isPlayer && myIsLeader) || p.resources <= 0) continue;

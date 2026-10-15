@@ -1,7 +1,7 @@
 // Basın açıklaması: etkiler ve kurgusal medya tepkileri.
 import { PRESS_STANCES, PAPERS, HEADLINES, SUBHEADS, CITIZENS, CITIZEN_LINES, PUNDITS, PUNDIT_LINES } from '../data/press.js';
 import { TOPICS, CLUSTERS } from '../data/clusters.js';
-import { DIFFICULTY } from './params.js';
+import { DIFFICULTY, turnEffect } from './params.js';
 import { clamp } from './util.js';
 import { addClusterMom } from './social.js';
 import { charMod } from './character.js';
@@ -21,7 +21,7 @@ function ideologyFit(p, st) {
 export function pressStatement(state, topic, stanceId, rng, fatigueMul = 1) {
   const p = state.parties[state.player.partyId];
   const st = stancesFor(topic).find(s => s.id === stanceId) || stancesFor(topic)[0];
-  const diff = DIFFICULTY[state.difficulty] || DIFFICULTY.zor;
+  const diff0 = DIFFICULTY[state.difficulty] || DIFFICULTY.zor, diff = { ...diff0, effect: diff0.effect * turnEffect(state) };
   const isGov = state.government.includes(p.id);
   const fit = ideologyFit(p, st);
   const reach = 0.3 + p.media + p.recognition;

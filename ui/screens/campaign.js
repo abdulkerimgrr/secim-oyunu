@@ -150,7 +150,7 @@ export function renderCampaign(view, ctx) {
   const cats = [...new Set(acts.map(a => a.cat))].sort((a, b) => (CAT_ORDER.indexOf(a) + 99) % 99 - (CAT_ORDER.indexOf(b) + 99) % 99);
   const pre = s.player.mode === 'join' && !s.player.isLeader;
   view.insertAdjacentHTML('beforeend', `<section class="card"><h2>${pre ? 'Kurultay kampanyası' : 'Bu turun eylemleri'}</h2>
-    <p class="small muted" style="margin:0">Kalan eylem puanı: <b style="color:var(--ink)">${s.player.ap}</b>. ${s.phase === 'campaign' ? 'Kampanya döneminde her tur bir gün ve 3 puandır.' : 'Her hafta puanların yenilenir; kullanılmayan puan aktarılmaz.'}
+    <p class="small muted" style="margin:0">Kalan eylem puanı: <b style="color:var(--ink)">${s.player.ap}</b>. ${s.phase === 'campaign' ? 'Kampanya döneminde (son 8 hafta) her tur bir haftadır.' : 'Her tur bir aydır; puanların her ay yenilenir, kullanılmayan puan aktarılmaz.'} Bazı eylemler bir turda sınırlı sayıda yapılabilir.
     ${pre ? ' Önce partinin kurultayını kazanmalısın; parti eylemleri genel başkan olunca açılır.' : ' Aynı ilde veya aynı eylemi arka arkaya yapmak seçmen yorgunluğu yaratır.'}</p></section>`);
   if (!pre) view.insertAdjacentHTML('beforeend', runningCampaigns(s));
   cats.forEach((cat, ci) => {

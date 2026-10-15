@@ -161,7 +161,7 @@ export const EXTRA_ACTIONS = {
       } },
   ],
   vaat: [
-    { id: 'promise', cat: 'Vaatler', icon: '📜', label: 'Vaat açıkla', ap: 1, params: ['choice:promise'],
+    { id: 'promise', limitPerTurn: 2, cat: 'Vaatler', icon: '📜', label: 'Vaat açıkla', ap: 1, params: ['choice:promise'],
       desc: 'Bir seçim vaadi açıkla. Hedef grupta kalıcı destek getirir ama bütçeye yük bindirir; toplam yük inandırıcılık sınırını aşarsa güven ve ekonomik inandırıcılık düşer.',
       choices(state) {
         ensureMetrics(state);
@@ -262,7 +262,7 @@ export const EXTRA_ACTIONS = {
       } },
   ],
   teskilat: [
-    { id: 'infra', cat: 'Teşkilat', icon: '🏗️', label: 'Seçim altyapısı', ap: 1, params: ['choice:infra'],
+    { id: 'infra', limitPerTurn: 2, cat: 'Teşkilat', icon: '🏗️', label: 'Seçim altyapısı', ap: 1, params: ['choice:infra'],
       desc: 'Gönüllü ağı, müşahitler, telefon bankası, koordinasyon merkezi, veri analitiği, mobil uygulama, gençlik ve kadın kolları. Her biri 4 seviye; seçim günü sandığa taşıma oranını belirler.',
       choices(state) { ensureMetrics(state); return { infra: INFRA.map(d => { const l = infraLevel(state, d.id), c = infraNextCost(state, d.id); return { id: d.id, icon: d.icon, label: d.label, meta: `Seviye ${l}/4${c ? ` → ${fmtMoney(c)}` : ' · tamamlandı'}`, desc: d.desc, level: l, disabled: c ? false : 'En üst seviyede' }; }) }; },
       cost: (state, { infra } = {}) => { ensureMetrics(state); return INFRA_COSTS[infraLevel(state, infra || INFRA[0].id)] || 0; },
@@ -289,7 +289,7 @@ export const EXTRA_ACTIONS = {
       } },
   ],
   cb: [
-    { id: 'cbPromise', cat: 'Cumhurbaşkanlığı', icon: '📜', label: 'Seçim vaadini hayata geçir', ap: 1, presidentOnly: true, params: ['choice:promise'],
+    { id: 'cbPromise', limitPerTurn: 1, cat: 'Cumhurbaşkanlığı', icon: '📜', label: 'Seçim vaadini hayata geçir', ap: 1, presidentOnly: true, params: ['choice:promise'],
       desc: 'Seçimde verdiğin bir vaadi uygula. Onay oranı ve güven artar; bütçeye yük olarak enflasyonu biraz yükseltir. Bir yıldan uzun bekleyen vaatler onayını aşındırır.',
       choices(state) { ensureMetrics(state); const open = state.player.promises.filter(x => !x.fulfilled); return { promise: open.length ? open.map(x => { const pr = byId(PROMISES, x.id); return { id: pr.id, icon: pr.icon, label: pr.label, meta: `₺${pr.cost} milyar/yıl` }; }) : [{ id: 'yok', icon: '—', label: 'Bekleyen vaat yok', disabled: 'Vaat yok' }] }; },
       cost: () => 0,

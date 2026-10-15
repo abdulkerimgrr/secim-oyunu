@@ -95,7 +95,7 @@ export function govTick(state, rng, f, { playerGoverns = false } = {}) {
   e.target = clamp(e.target - 0.008 * (e.policyRate - e.inflation) * f, 8, 95);
 
   // --- Dış ilişkiler: yavaş ortalamaya dönüş, ekonomiye etki ---
-  for (const k of Object.keys(state.foreign)) state.foreign[k] += (50 - state.foreign[k]) * 0.004 * f + rng.normal(0, 0.3) * f;
+  for (const k of Object.keys(state.foreign)) state.foreign[k] += (50 - state.foreign[k]) * 0.004 * f + rng.normal(0, 0.3) * Math.sqrt(f);
   const fs = foreignScore(state);
   e.usdTry = +(e.usdTry * (1 + (50 - fs) * 0.00004 * f)).toFixed(2);
 

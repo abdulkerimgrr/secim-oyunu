@@ -1,6 +1,6 @@
 // Tur döngüsü: rakipler, ekonomi, sönümler, teşkilat, bütçe, olaylar, takvim, anket.
 import { createRng } from './rng.js';
-import { K, DIFFICULTY } from './params.js';
+import { K, DIFFICULTY, TURN } from './params.js';
 import { economyStep } from './economy.js';
 import { takePoll } from './polls.js';
 import { runGeneralElection, runLocalElection } from './election.js';
@@ -117,11 +117,32 @@ function checkEnd(state) {
   }
 }
 
+// Eski (haftalık turlu) kayıtları aylık tur düzenine taşı
+function migrateTurns(state) {
+  if (state.flags.monthlyTurns) return;
+  state.flags.monthlyTurns = true;
+  state.rules.campaignDays = Math.max(state.rules.campaignDays, 56);
+  if (state.player.apMax < 8) { state.player.apMax = state.player.apMax * 2 + 2; state.player.ap = Math.min(state.player.ap * 2, state.player.apMax); }
+}
+
+// Turun uzunluğu (gün): normal dönemde bir ay, kampanyada bir hafta; önemli tarihleri atlamaz
+export function turnDays(state) {
+  const toElection = daysBetween(state.date, state.nextElection);
+  if (state.phase === 'campaign') return Math.max(1, Math.min(TURN.campaignDays, toElection));
+  const stops = [toElection - state.rules.campaignDays, state.localElection && daysBetween(state.date, state.localElection)];
+  const k = state.player.mode === 'join' && !state.player.isLeader ? state.player.kurultay : null;
+  if (k) stops.push(!k.sigChecked && daysBetween(state.date, k.sigDeadline), daysBetween(state.date, k.date));
+  let d = TURN.normalDays;
+  for (const x of stops) if (x && x >= 7 && x < d) d = x;
+  return d;
+}
+
 // Bir tur ilerlet. Dönüş: { results: [seçim/kurultay sonuçları] }
 export function endTurn(state) {
   return withRng(state, rng => {
     const out = { results: [] };
-    const days = state.phase === 'campaign' ? 1 : 7;
+    migrateTurns(state);
+    const days = turnDays(state);
     const f = days / 7;
     ensureGovState(state);
     ensureMetrics(state);
@@ -168,7 +189,7 @@ export function endTurn(state) {
     if (state.player.mode === 'join' && !state.player.isLeader) weeklyPull(state, state.player.kurultay, me.id, rng, f);
 
     // Olaylar
-    maybeTriggerEvent(state, rng, state.phase === 'campaign' ? 0.2 : 0.45);
+    maybeTriggerEvent(state, rng, state.phase === 'campaign' ? 0.35 : 0.75);
     crisisTick(state, rng);
     if (state.intel > 0) state.intel -= f;
     if (staffMod(state, 'intel')) state.intel = Math.max(state.intel || 0, 1);
@@ -203,7 +224,7 @@ export function endTurn(state) {
         me.onBallot = el.ok;
         addNews(state, 'info', el.ok ? `YSK açıkladı: ${me.short} seçime katılabilecek` : `YSK listesinde ${me.short} yok: seçime katılma şartları sağlanamadı`);
       }
-      addNews(state, 'info', 'Seçim kampanyası resmen başladı. Artık her tur bir gün.');
+      addNews(state, 'info', 'Seçim kampanyası resmen başladı. Son 8 hafta: artık her tur bir hafta.');
     }
     if (toElection <= 0) {
       const r = runGeneralElection(state, rng);
@@ -216,9 +237,10 @@ export function endTurn(state) {
     }
 
     // Anket (normalde haftalık, kampanyada 2 günde bir)
-    if (state.phase !== 'campaign' || state.turn % 2 === 0) takePoll(state, rng);
+    takePoll(state, rng);
 
-    state.player.ap = state.phase === 'campaign' ? 3 + charMod(state, 'ap') : state.player.apMax;
+    state.player.ap = state.phase === 'campaign' ? TURN.apCampaign + charMod(state, 'ap') : state.player.apMax;
+    state.player.used = {};
     checkEnd(state);
     return out;
   });

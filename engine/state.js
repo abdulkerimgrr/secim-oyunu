@@ -8,7 +8,7 @@ import { PROVINCES } from '../data/generated/provinces.js';
 import { FIRST_NAMES, LAST_NAMES, SKILLS } from '../data/founders.js';
 import { clusterSharesFromVotes, calibrate, project, misery } from './model.js';
 import { createRng } from './rng.js';
-import { DIFFICULTY } from './params.js';
+import { DIFFICULTY, TURN } from './params.js';
 import { deepClone, clamp, addDays } from './util.js';
 import { takePoll } from './polls.js';
 import { computeSeats } from './election.js';
@@ -185,24 +185,24 @@ export function newGame(opts) {
     };
     state.player = {
       mode: 'found', partyId: PLAYER_ID, name: opts.playerName, isLeader: true, character,
-      apMax: 5 + (has('saha') ? 1 : 0), ap: 0,
+      apMax: TURN.apMonth + (has('saha') ? 2 : 0), ap: 0,
     };
-    state.player.apMax += charMod(state, 'ap');
+    state.player.apMax += 2 * charMod(state, 'ap');
     const lp = state.parties[PLAYER_ID].leader;
     lp.image = lp.image0 = 0.5 + charMod(state, 'image');
     state.camp[character.hometown] = { [PLAYER_ID]: 0.15 }; // memleket etkisi
     state.newPartyE = 0;
   } else {
     const party = state.parties[opts.joinPartyId];
-    const kDate = party.kurultay || addDays(state.date, 7 * 16);
+    const kDate = party.kurultay || addDays(state.date, 150); // olağanüstü kurultay: ~5 ay
     const k = initKurultay(party.id, kDate, !!party.kurultay);
     recalcSupport(k);
     k.startSupport = k.support;
     state.player = {
       mode: 'join', partyId: party.id, name: opts.playerName, isLeader: false, character,
-      apMax: 5, ap: 0, personalMoney: 0, kurultay: k,
+      apMax: TURN.apMonth, ap: 0, personalMoney: 0, kurultay: k,
     };
-    state.player.apMax += charMod(state, 'ap');
+    state.player.apMax += 2 * charMod(state, 'ap');
     state.player.personalMoney = Math.round(1_500_000 * diff.money * charMod(state, 'money'));
     party.isPlayer = true;
   }

@@ -17,7 +17,7 @@ export function renderSettings(view, ctx) {
     <p class="small muted" style="margin:0 0 8px">Kaydı başka bir cihaza taşımak için metni kopyala, diğer cihazda yapıştır.</p>
     <div class="grid2"><button class="btn" id="exp">Dışa aktar</button><button class="btn" id="imp">İçe aktar</button></div></section>`);
   view.insertAdjacentHTML('beforeend', `<section class="card"><h2>Oyun</h2><dl class="kv"><dt>Zorluk</dt><dd>${DIFFICULTY[s.difficulty].label}</dd><dt>Senaryo</dt><dd>2023 · seçim sonrası</dd><dt>Tohum</dt><dd>${s.seed}</dd></dl>
-    <div class="grid2" style="margin-top:10px"><button class="btn" id="ff4">4 hafta hızlı ilerle</button><button class="btn" id="ff26">26 hafta hızlı ilerle</button></div>
+    <div class="grid2" style="margin-top:10px"><button class="btn" id="ff4">1 ay hızlı ilerle</button><button class="btn" id="ff26">6 ay hızlı ilerle</button></div>
     <button class="btn block" style="margin-top:8px" id="fftest">Test modu: seçim gecesine kadar ilerle</button>
     <p class="small muted" style="margin:6px 0 0">Hızlı ilerlemede eylem yapılmaz, bekleyen olaylar düşer; eylemsiz yeni parti zamanla iflas edebilir. Test modu para, teşkilat ve kongre şartlarını otomatik sağlar (bu oyunun kaydı "test" olarak işaretlenir).</p>
     <button class="btn red block" style="margin-top:10px" id="newgame">Ana menü / yeni oyun</button></section>`);
@@ -57,8 +57,8 @@ export function renderSettings(view, ctx) {
     sh.root.querySelector('#imp-f').onchange = e => { const f = e.target.files[0]; if (f) f.text().then(load); };
     sh.root.querySelector('#imp-go').onclick = () => load(sh.root.querySelector('#imp-t').value);
   };
-  view.querySelector('#ff4').onclick = () => ctx.fastForward(4);
-  view.querySelector('#ff26').onclick = () => ctx.fastForward(26);
+  view.querySelector('#ff4').onclick = () => ctx.fastForward(1);
+  view.querySelector('#ff26').onclick = () => ctx.fastForward(6);
   view.querySelector('#fftest').onclick = () => ctx.fastForward(400, { test: true });
   view.querySelector('#newgame').onclick = () => {
     const sh = sheet(`<h2>Ana menüye dön?</h2><p>Oyunun otomatik kayıtta saklı; oradan devam edebilirsin.</p><div class="grid2"><button class="btn" data-a="no">Vazgeç</button><button class="btn red" data-a="yes">Ana menü</button></div>`);

@@ -1,7 +1,7 @@
 // Canlı yayın: soru seçimi ve cevapların anlık etkileri.
 import { KURULTAY_QUESTIONS, GENERAL_QUESTIONS, HOSTS, CHANNEL_NAMES, PROGRAMS } from '../data/tv.js';
 import { answerFactionEffects, bumpFaction, recalcSupport } from './kurultay.js';
-import { DIFFICULTY } from './params.js';
+import { DIFFICULTY, turnEffect } from './params.js';
 import { clamp } from './util.js';
 import { charMod } from './character.js';
 import { staffMod } from './staff.js';
@@ -34,7 +34,7 @@ export function questionById(id) {
 export function applyAnswer(state, b, ansIndex, rng) {
   const q = questionById(b.questions[b.step]);
   const a = q.answers[ansIndex];
-  const diff = DIFFICULTY[state.difficulty] || DIFFICULTY.zor;
+  const diff = DIFFICULTY[state.difficulty] || DIFFICULTY.zor; // canlı yayın etkisi tur uzunluğuyla ölçeklenmez (ayda en fazla 2–3 yayın)
   const out = { lines: [], deltas: {} };
   const tv = charMod(state, 'tv') * staffMod(state, 'tv');
   if (b.kind === 'kurultay') {

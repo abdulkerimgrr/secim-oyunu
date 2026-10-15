@@ -32,14 +32,14 @@ while (!s.gameOver && i < 400) {
     withRng(s, rng => resolveEvent(s, ev.uid, idx, rng));
   }
   let guard = 0;
-  while (s.player.ap > 0 && guard++ < 10) {
+  while (s.player.ap > 0 && guard++ < 30) {
     const me = playerParty(s);
     let act, prm = {};
     if (mode === 'join' && !s.player.isLeader) {
       const k = s.player.kurultay;
       if (k.signatures < k.sigNeed * 100 + 4 && k.signatures < k.support * 1.6 + 5) act = A('signatures');
-      else if (guard === 1 && i % 2 === 0) act = A('vision');
-      else if (guard === 2 && i % 3 === 0 && s.player.ap >= 2) {
+      else if (guard === 1 || guard === 5) act = A('vision');
+      else if ((guard === 2 || (guard === 3 && i % 2 === 0)) && s.player.ap >= 2) {
         act = A('faction');
         const best = SMART ? k.factions.slice().sort((a, b) => b.weight * (92 - b.support) - a.weight * (92 - a.support))[0].id : ['teskilat', 'degisimci', 'cekirdek'][i % 3];
         prm = { faction: best };
@@ -78,7 +78,7 @@ while (!s.gameOver && i < 400) {
   }
   const out = endTurn(s);
   for (const r of out.results) results.push(r);
-  if (i % (mode === 'join' && !s.player.isLeader ? 4 : 26) === 0) {
+  if (i % (mode === 'join' && !s.player.isLeader ? 1 : 6) === 0) {
     const me = playerParty(s), poll = s.polls[s.polls.length - 1].shares;
     console.log(s.date, `oy ${(100 * (poll[me.id] || 0)).toFixed(2)}%`, `tanınırlık ${(100 * me.recognition).toFixed(0)}%`, `para ${(me.money / 1e6).toFixed(1)}M`,
       `il ${Object.keys(me.orgs).length}`, `huzur ${me.unity.toFixed(0)}`, `enf ${s.economy.inflation.toFixed(0)}`,

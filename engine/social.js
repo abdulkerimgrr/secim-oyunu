@@ -1,7 +1,7 @@
 // Sosyal medya kampanyaları: başlatma, haftalık etki ve izlenme istatistikleri.
 import { SOCIAL_CAMPAIGNS } from '../data/social.js';
 import { CLUSTERS } from '../data/clusters.js';
-import { DIFFICULTY } from './params.js';
+import { DIFFICULTY, turnEffect } from './params.js';
 import { clamp, addDays } from './util.js';
 import { charMod } from './character.js';
 import { addNews } from './news.js';
@@ -19,7 +19,7 @@ export function addClusterMom(state, partyId, audience, amount) {
 // Kampanya başlat: hemen etkiler (viral/ters tepme) + sürecek kampanya kaydı
 export function launchCampaign(state, def, prm, rng, fatigueMul = 1) {
   const p = state.parties[state.player.partyId];
-  const diff = DIFFICULTY[state.difficulty] || DIFFICULTY.zor;
+  const diff0 = DIFFICULTY[state.difficulty] || DIFFICULTY.zor, diff = { ...diff0, effect: diff0.effect * turnEffect(state) };
   const dig = state.player.mode === 'found' ? Math.max(0, ...(p.founders || []).filter(f => f.skill === 'dijital').map(f => f.level)) : 0.4;
   const viral = def.viral ? rng.chance(def.viral * (1 + dig) * (state.player.character?.traits?.includes('medyatik') ? 1.3 : 1) * staffMod(state, 'viral')) : false;
   const backfire = !viral && def.backfire ? rng.chance(def.backfire * charMod(state, 'gaffe') * staffMod(state, 'backfire')) : false;

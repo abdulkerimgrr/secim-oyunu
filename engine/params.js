@@ -20,3 +20,8 @@ export const DIFFICULTY = {
   zor:     { label: 'Zor',      effect: 1.0,  rival: 1.0, money: 1.0, noise: 1.0 },
   cokzor:  { label: 'Çok zor',  effect: 0.85, rival: 1.2, money: 0.8, noise: 1.2 },
 };
+
+// Tur uzunluğu: normal dönemde 1 ay, seçim kampanyasında 1 hafta. Eylem başına etki, turda daha az
+// eylem yapıldığı için ölçeklenir (haftalık sürümle yaklaşık aynı aylık toplam etki).
+export const TURN = { normalDays: 30, campaignDays: 7, apMonth: 12, apCampaign: 8 };
+export function turnEffect(state) { return state?.phase === 'campaign' ? 1.35 : 1.7; }

@@ -89,7 +89,7 @@ export function renderNewGame(view, ctx) {
     html = `<h1 style="font-size:30px">Hangi partiye?</h1><p class="muted">Genel başkan adayı olarak kurultaya gideceksin. Mevcut liderin etkisi ve delege yapısı zorluğu belirler.</p>
       <div class="list card">${scenarioParties(w.year).filter(p => !p.aggregate).map(p => `<button class="li" data-join="${p.id}" style="background:${w.joinPartyId === p.id ? '#EEF2F9' : 'none'};border:0;text-align:left;width:100%">
         <span class="badge" style="background:${p.color}">${esc(p.short)}</span>
-        <div class="grow"><div class="t">${esc(p.name)}</div><div class="small muted">Genel başkan: ${esc(p.leader)} · ${shareTxt(p)}${p.kurultay ? ` · kurultay ${fmtDate(p.kurultay)}` : ' · olağanüstü kurultay senaryosu (16 hafta)'}</div>${p.note ? `<div class="small muted" style="opacity:.8">${esc(p.note)}</div>` : ''}</div>
+        <div class="grow"><div class="t">${esc(p.name)}</div><div class="small muted">Genel başkan: ${esc(p.leader)} · ${shareTxt(p)}${p.kurultay ? ` · kurultay ${fmtDate(p.kurultay)}` : ' · olağanüstü kurultay senaryosu (5 ay)'}</div>${p.note ? `<div class="small muted" style="opacity:.8">${esc(p.note)}</div>` : ''}</div>
         <span class="pill ${(JOIN_DIFF[p.id] || 'Zor').startsWith('Zor') ? 'warn' : 'bad'}">${JOIN_DIFF[p.id] || 'Zor'}</span></button>`).join('')}</div>
       <div class="grid2">${back('mode')}<button class="btn primary" data-next="character" ${w.joinPartyId ? '' : 'disabled'}>Devam</button></div>`;
   } else if (w.step === 'final') {
@@ -402,8 +402,8 @@ function splashHtml() {
   const steps = [
     ['Karakterini oluştur', 'Görünüm, meslek, memleket ve kişilik seç.'],
     ['Partini kur ya da kurultayı kazan', 'Yeni partiyle 41 ilde teşkilat kur veya gerçek bir partinin delegelerini ikna et.'],
-    ['Her hafta 5 eylem puanını kullan', 'Miting, TV, basın açıklaması, sosyal medya, teşkilat ve bağış.'],
-    ['Gündeme cevap ver, turu bitir', 'Olaylara tutum al; anketler, rakipler ve ekonomi her hafta değişir.'],
+    ['Her ay 12 eylem puanını kullan', 'Miting, buluşma, medya, sosyal medya, vaat, teşkilat ve bağış. Seçimden önceki son 8 hafta turlar haftalık olur.'],
+    ['Gündeme cevap ver, turu bitir', 'Olaylara ve krizlere tutum al; anketler, rakipler ve ekonomi her ay değişir.'],
     ['Seçim gecesi', '%7 barajı geç, sandalye kazan, iktidarı hedefle.'],
   ];
   return `<section class="splash"><div class="stripe" aria-hidden="true"></div>

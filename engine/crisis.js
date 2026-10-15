@@ -90,10 +90,10 @@ export function crisisTick(state, rng) {
     if (rng.chance(it.chance)) spawnChain(state, it.id);
   }
   const active = state.events.active;
-  if (!active.some(e => e.crisis) && active.length < 3 && rng.chance(state.phase === 'campaign' ? 0.03 : 0.07)) spawnCrisis(state, rng);
+  if (!active.some(e => e.crisis) && active.length < 3 && rng.chance(state.phase === 'campaign' ? 0.08 : 0.22)) spawnCrisis(state, rng);
   // Seçime yaklaşırken ve geride kalırken etik dışı bir teklif gelebilir
   const weeksToElection = (Date.parse(state.nextElection) - Date.parse(state.date)) / 6048e5;
-  if (!state.flags.deepfakeOffered && weeksToElection < 26 && (state.player.heat > 35 || rng.chance(0.3)) && rng.chance(0.05)) {
+  if (!state.flags.deepfakeOffered && weeksToElection < 26 && (state.player.heat > 35 || rng.chance(0.3)) && rng.chance(state.phase === 'campaign' ? 0.08 : 0.15)) {
     state.flags.deepfakeOffered = state.date;
     spawnChain(state, 'deepfake');
   }
