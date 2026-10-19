@@ -202,8 +202,8 @@ export const ACTIONS = [
       const wM = v.open ? weather.mult : 1;
       const camp = 0.12 * diff(state).effect * quality * fit * toneM * f * charMod(state, 'rally') * home * v.effect * clashM;
       const rec = (0.003 + 0.012 * Math.sqrt(info.popShare)) * (0.5 + p.media) * diff(state).effect * f * (v.id === 'salon' ? 0.6 : 1) * clashM;
-      const crowd = info.registered * 0.004 * (0.15 + p.recognition) * (0.25 + org) * (1 + 0.3 * skill(state, 'saha')) * t.crowd * wM * clashM * staffMod(state, 'crowd');
-      const capacity = v.id === 'salon' ? clamp(info.registered * 0.0008, 1500, 9000) : Math.max(2500, info.registered * 0.004 * v.cap);
+      const crowd = info.registered * 0.009 * (0.15 + p.recognition) * (0.25 + org) * (1 + 0.3 * skill(state, 'saha')) * t.crowd * wM * clashM * staffMod(state, 'crowd');
+      const capacity = v.id === 'salon' ? clamp(info.registered * 0.0008, 1500, 9000) : Math.max(4000, info.registered * 0.009 * v.cap);
       return { camp: [camp * 0.6, camp * 1.3], recognition: [rec * 0.7, rec * 1.3], crowd, capacity, fill: crowd / capacity, fit, weather: v.open ? weather : null, clash,
         risk: gaffeChance(state, tone === 'sert' ? 0.1 : 0.05), transportRisk: t.risk * staffMod(state, 'scandal'), fatigue: f, speech: sp, venue: v };
     },

@@ -1,4 +1,5 @@
 // Cumhurbaşkanlığı seçimi: adaylık (%5 veya grup veya 100 bin imza), iki tur, oy aktarımı.
+import { econGrievance } from './model.js';
 import { ideologyDistance } from './model.js';
 import { clamp } from './util.js';
 import { DIFFICULTY } from './params.js';
@@ -55,7 +56,7 @@ function candidateTotals(state, cands, partyVotes, rng, noise) {
     });
   }
   // Ekonomik oy: hoşnutsuzluk iktidar adayını aşındırır, muhalefet adaylarına yarar
-  const md = Math.max(-15, Math.min(35, state.economy.inflation + 2 * state.economy.unemployment - state.economy.misery0));
+  const md = econGrievance(state.economy);
   for (const c of cands) {
     let appeal = Math.exp(1.2 * ((c.image ?? 0.55) - 0.55));
     const incumbent = c.parties.some(id => state.government.includes(id));

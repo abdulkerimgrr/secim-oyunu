@@ -83,9 +83,12 @@ export function govTick(state, rng, f, { playerGoverns = false } = {}) {
     addNews(state, 'econ', `TÜİK: Yıllık enflasyon %${e.inflation.toFixed(1).replace('.', ',')} oldu (önceki ay %${prev.toFixed(1).replace('.', ',')}); işsizlik %${e.unemployment.toFixed(1).replace('.', ',')}`);
     // Merkez Bankası kararı (oyuncu cumhurbaşkanı değilse kural tabanlı)
     if (!playerGoverns) {
-      const want = clamp(e.inflation * 0.95 + 3 + (state.flags.tight ? 6 : 0), 5, 70);
-      const step = Math.round(clamp((want - e.policyRate) * 0.35, -5, 7.5) * 2) / 2;
-      e.policyRate = clamp(e.policyRate + step, 0, 70);
+      const real = e.realUntil && e.rateBefore !== undefined;
+      // Gerçek veri yoksa: pozitif reel faiz hedefleyen, kademeli hareket eden kural (2024 sonrası TCMB pratiğine benzer)
+      const want = clamp(e.inflation + 5 + (state.flags.tight ? 4 : 0), 5, 70);
+      const step = real ? e.policyRate - e.rateBefore : Math.round(clamp((want - e.policyRate) * 0.3, -3, 5) * 2) / 2;
+      if (!real) e.policyRate = clamp(e.policyRate + step, 0, 70);
+      e.rateBefore = e.policyRate;
       const rt = `%${e.policyRate.toFixed(1).replace('.', ',')}`;
       addNews(state, 'econ', step > 0 ? `Merkez Bankası politika faizini ${step.toFixed(1).replace('.', ',')} puan artırdı; yeni faiz ${rt}` : step < 0 ? `Merkez Bankası faiz indirdi; yeni politika faizi ${rt}` : `Merkez Bankası politika faizini sabit tuttu (${rt})`);
     }

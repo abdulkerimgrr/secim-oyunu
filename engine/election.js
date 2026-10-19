@@ -1,7 +1,7 @@
 // Milletvekili genel seçimi: baraj, ittifak kuralı, seçim bölgesi bazında D'Hondt.
 import { mobilizer } from './metrics.js';
 import { dhondt } from './dhondt.js';
-import { project, allianceShare } from './model.js';
+import { project, allianceShare, ideologyDistance, econGrievance } from './model.js';
 import { K, DIFFICULTY } from './params.js';
 import { REGION_NAMES } from './regions.js';
 import { runPresidential } from './presidential.js';
@@ -87,6 +87,7 @@ export function runGeneralElection(state, rng) {
   result.government = gov;
   state.camp = {};
   state.economy.misery0 = state.economy.inflation + 2 * state.economy.unemployment; // yeni dönem: beklentiler sıfırlanır
+  state.economy.miserySm = state.economy.misery0; state.economy.pain = (state.economy.pain || 0) * 0.4; // eski şikâyetin bir kısmı yeni döneme taşınır
   state.elections.push({ date: result.date, type: 'genel', national: result.national, seats });
   // Aynı gün cumhurbaşkanlığı seçimi (hükümeti cumhurbaşkanının ittifakı kurar)
   result.cb = runPresidential(state, rng, pr);
@@ -96,19 +97,60 @@ export function runGeneralElection(state, rng) {
 
 // Basitleştirilmiş yerel seçim: her ilde il/büyükşehir belediye başkanlığı (en çok oy alan).
 // Tam yerel seçim (ilçe, belde, meclis) Aşama 6'da.
+// Yerel seçim gerçekçiliği:
+//  1) İttifak içi aday paylaşımı: ittifak üyeleri her ilde tek aday çıkarır (genelde en güçlü üye;
+//     küçük ortak, büyük ortağın oyunun %60'ına ulaştığı illerde aday olur). Ortakların oyu %90 aktarılır.
+//  2) Stratejik oy: ilde ilk iki dışında kalan partilerin seçmeninin bir kısmı (en fazla %45),
+//     ideolojik olarak yakın olan güçlü adaya kayar (belediye başkanlığı tek turludur).
+//  3) Yerel aday etkisi: il bazında ek sapma. Katsayılar oyun tasarımıdır.
+export function localRace(state, shares, rng) {
+  const P = state.parties;
+  const v = {};
+  // Ekonomik protesto: hayat pahalılığına kızgın iktidar seçmeninin bir kısmı yerel seçimde sandığa gitmez
+  const protest = 1 - 0.007 * Math.max(0, econGrievance(state.economy));
+  const gov = new Set(state.government);
+  for (const [id, s] of Object.entries(shares)) if (!P[id].aggregate) v[id] = s * Math.exp(rng.normal(0, 0.12)) * (gov.has(id) || (P[id].alliance && state.government.some(g => P[g]?.alliance === P[id].alliance)) ? protest : 1);
+  const isGovSide = id => gov.has(id) || (P[id].alliance && state.government.some(g => P[g]?.alliance === P[id].alliance));
+  const groups = {};
+  for (const id of Object.keys(v)) { const a = P[id].alliance; if (a) (groups[a] ||= []).push(id); }
+  for (const ids of Object.values(groups)) {
+    if (ids.length < 2) continue;
+    ids.sort((a, b) => v[b] - v[a]);
+    const seniorOverall = ids.slice().sort((a, b) => (P[b].lastShare || 0) - (P[a].lastShare || 0))[0];
+    let cand = seniorOverall;
+    if (v[ids[0]] !== v[seniorOverall] && v[ids[0]] >= 0.6 * v[seniorOverall]) cand = ids[0];
+    else if (ids.find(x => x !== seniorOverall && v[x] >= 0.6 * v[seniorOverall])) cand = ids.find(x => x !== seniorOverall && v[x] >= 0.6 * v[seniorOverall]);
+    let pool = 0;
+    for (const id of ids) if (id !== cand) { pool += v[id] * 0.9; v[id] = 0; }
+    v[cand] += pool;
+  }
+  const order = Object.entries(v).sort((a, b) => b[1] - a[1]);
+  const top = order.slice(0, 2).map(([id]) => id);
+  for (const [id, s] of order.slice(2)) {
+    if (!s) continue;
+    // Önce aynı bloktaki (iktidar/muhalefet) güçlü adaya; yoksa ideolojik olarak yakın olana
+    const same = top.filter(t => isGovSide(t) === isGovSide(id));
+    let to, k;
+    if (same.length === 1) { to = same[0]; k = isGovSide(id) ? 0.4 : 0.55; }
+    else {
+      const d = top.map(t => ideologyDistance(P[id].ideology, P[t].ideology));
+      const near = d[0] <= d[1] ? 0 : 1;
+      to = top[near]; k = 0.35 * Math.max(0, 1 - d[near] / 1.2);
+    }
+    v[to] += s * k; v[id] -= s * k;
+  }
+  return v;
+}
+
 export function runLocalElection(state, rng) {
   const noise = electionNoise(state, rng);
+  state.turnoutShift = -0.09 + rng.normal(0, 0.015); // yerel seçimde katılım genel seçimden düşük (2024: %78)
   const pr = project(state, { ballotOnly: true, noise, mobilize: mobilizer(state) });
+  state.turnoutShift = 0;
   const mayors = {};
-  for (const [pl, v] of Object.entries(pr.provinces)) {
-    // yerelde aday etkisi: her partiye ek il bazlı gürültü
-    let best = null, bv = -1;
-    for (const [id, s] of Object.entries(v.shares)) {
-      if (state.parties[id].aggregate) continue;
-      const val = s * Math.exp(rng.normal(0, 0.12));
-      if (val > bv) { bv = val; best = id; }
-    }
-    mayors[pl] = best;
+  for (const [pl, pv] of Object.entries(pr.provinces)) {
+    const v = localRace(state, pv.shares, rng);
+    mayors[pl] = Object.entries(v).sort((a, b) => b[1] - a[1])[0][0];
   }
   state.mayors = mayors;
   const count = {};

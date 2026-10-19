@@ -18,6 +18,14 @@ export function ideologyDistance(a, b) {
 
 export function misery(econ) { return econ.inflation + 2 * econ.unemployment; }
 
+// Seçmenin iktidara yönelik ekonomik şikâyeti (sefalet endeksi puanı, −4 … 25):
+// hareketli ortalama sefaletin seçim dönemi başına göre artışı; yaşanan zirve yavaş unutulur
+// (yaklaşık yılda %55 söner). Ekonomi düzelince iktidar ödüllendirilir ama sınırlı.
+export function econGrievance(e) {
+  const cur = (e.miserySm ?? misery(e)) - e.misery0;
+  return Math.max(Math.max(-4, Math.min(25, cur)), Math.min(25, e.pain || 0));
+}
+
 // 2023 parti oylarından küme payları
 export function clusterSharesFromVotes(votes) {
   const tot = Object.values(votes).reduce((a, b) => a + b, 0) || 1;
@@ -43,7 +51,7 @@ export function activeParties(state, { ballotOnly = false } = {}) {
 
 // Her tur bir kez hesaplanan parti bazlı terimler
 function precompute(state, parties) {
-  const m = misery(state.economy) - state.economy.misery0;
+  const m = econGrievance(state.economy);
   const near = electionProximity(state);
   const lastPoll = state.polls.length ? state.polls[state.polls.length - 1].shares : null;
   const thr = state.rules.parliament.threshold;
@@ -62,7 +70,7 @@ function precompute(state, parties) {
             - K.ideologyShift * shift * shift * 4
             + (p.trust !== undefined ? 0.12 * (p.trust - 50) / 50 : 0), // güven (yalnızca oyuncu partisinde tanımlı)
       mom: p.momentum,
-      econ: (p.govWeight || 0) * Math.max(-20, Math.min(30, m)) * K.econ,
+      econ: (p.govWeight || 0) * m * K.econ,
       tactical,
       cmom: sumArr(state.clusterMom?.[p.id], state.promiseMom?.[p.id]),
       dist: CLUSTERS.map(c => ideologyDistance(c.ideo, p.ideology)),

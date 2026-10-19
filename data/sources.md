@@ -77,3 +77,10 @@ Bakan istifaları, skandallar ve kabine krizleri kurgusal senaryolardır. Meclis
 
 ## Tur uzunluğu (tasarım)
 Normal dönemde her tur 1 aydır (12 eylem puanı); seçimden önceki son 8 hafta kampanya dönemidir ve her tur 1 haftadır (8 eylem puanı). Eylem etkileri, turda yapılan eylem sayısı azaldığı için ölçeklenmiştir (normal ×1,7, kampanya ×1,35; canlı yayınlar hariç). Bazı eylemlerin tur başına sınırı vardır. Denge, haftalık sürümle aynı kurultay ve seçim sonuçlarını verecek şekilde simülasyonla ayarlanmıştır.
+
+## Gerçekçilik ayarları
+- **Gerçek ekonomik seyir** (`data/economyReal.js`): 2023 başlangıcında Haziran 2023–Eylül 2026 arası enflasyon (TÜİK), politika faizi (TCMB), kur ve işsizlik gerçek değerleri izler; sonrasında simülasyon devralır. 2025 aylık TÜFE: Alomaliye, ASMMMO; 2026: ASMMMO, haber kaynakları (Mart–Nisan 2026 yıllık değerler aylık verilerden türetildi, **tahmini**); faiz: TCMB para politikası metinleri ve haber kaynakları; dolar/TL ve işsizlik ay sonu değerleri **yaklaşık**.
+- **Ekonomik oy**: seçmen sefalet endeksinin (enflasyon + 2×işsizlik) yaklaşık 6 aylık ortalamasına tepki verir; yaşanan zirve yavaş unutulur (yılda ~%55). Ekonomi düzelince iktidar sınırlı ödüllendirilir. Katsayılar **tasarım**, 2024–2026 anket seyrine yakın sonuç verecek şekilde ayarlandı.
+- **Yerel seçim**: ittifak içi tek aday (küçük ortak güçlü olduğu illerde aday), blok içi stratejik oy, ekonomik protesto kaynaklı iktidar seçmeni katılım kaybı ve düşük katılım (~%78). Pasif oyuncuyla 2024 sonucu ortalama CHP 30, AK Parti 27, DEM 13, MHP 12 il (gerçek: 35, 24, 10, 8). Katsayılar **tasarım**.
+- **Anket hatası**: tek anket yerine anket ortalamasına yakın (±1 puan civarı); aylık dalgalanma ~1 puan.
+- **Miting kalabalıkları**: büyük partilerin büyükşehir mitinglerinde on binler (**tasarım**, gerçek katılım rakamları tartışmalıdır).

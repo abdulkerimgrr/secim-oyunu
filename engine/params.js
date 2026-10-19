@@ -3,7 +3,7 @@ export const K = {
   recog: 1.4,        // tanınırlık: log(tanınırlık) çarpanı
   org: 0.8,          // teşkilat gücü: log(güç + 0.03) çarpanı
   image: 1.6,        // lider imajı değişimi
-  econ: 0.035,       // sefalet endeksi (enflasyon + 2×işsizlik) değişiminin iktidara etkisi
+  econ: 0.022,       // sefalet endeksi (enflasyon + 2×işsizlik) değişiminin iktidara etkisi
   tactical: 0.8,     // barajın altında kalan partiye taktik oy cezası
   ideologyShift: 2.0,// tabanın ideoloji kaymasına tepkisi (katıl modunda)
   campDecay: 0.93,   // haftalık kampanya etkisi sönümü
@@ -11,7 +11,7 @@ export const K = {
   noiseNat: 0.06,    // seçim günü ulusal sapma (fayda birimi)
   noiseReg: 0.05,    // bölgesel sapma
   noiseUnit: 0.07,   // seçim bölgesi sapması
-  pollSd: 0.012,     // anket hatası (yüzde puan / 100)
+  pollSd: 0.007,     // anket hatası (yüzde puan / 100)
 };
 
 export const DIFFICULTY = {
