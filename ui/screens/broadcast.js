@@ -1,4 +1,5 @@
 // Canlı yayın ekranı: jenerik, stüdyo, kamera geçişleri, canlı yorumlar, cevap süresi ve reyting.
+import { MEDIA } from '../../data/media.js';
 import { esc, el } from '../dom.js';
 import { avatarSvg } from '../avatar.js';
 import { mixColor } from '../map.js';
@@ -31,7 +32,7 @@ export function showBroadcast(ctx, b) {
   const guestBg = mixColor('#1B2C55', me.color, 0.35);
   const o = el(`<div class="tv" role="dialog" aria-modal="true" aria-label="Canlı yayın">
     <div class="tv-screen" id="tvs">
-      <div class="tv-led"><div class="tv-sky"></div><svg viewBox="0 0 400 80" preserveAspectRatio="none" class="tv-city"><path d="M0 80 L0 50 L20 50 L20 30 L34 30 L34 44 L52 44 L52 20 L60 12 L68 20 L68 46 L90 46 L90 34 L110 34 L110 56 L130 56 L130 26 L150 26 L150 40 L172 40 L172 14 L178 6 L184 14 L184 44 L210 44 L210 30 L236 30 L236 52 L262 52 L262 22 L284 22 L284 48 L310 48 L310 36 L330 36 L330 54 L352 54 L352 28 L372 28 L372 46 L400 46 L400 80 Z" fill="rgba(255,255,255,.12)"/></svg></div>
+      <div class="tv-led" ${MEDIA['bg:tv'] ? `style="background:url(${MEDIA['bg:tv']}) center/cover"` : ''}><div class="tv-sky"></div><svg viewBox="0 0 400 80" preserveAspectRatio="none" class="tv-city"><path d="M0 80 L0 50 L20 50 L20 30 L34 30 L34 44 L52 44 L52 20 L60 12 L68 20 L68 46 L90 46 L90 34 L110 34 L110 56 L130 56 L130 26 L150 26 L150 40 L172 40 L172 14 L178 6 L184 14 L184 44 L210 44 L210 30 L236 30 L236 52 L262 52 L262 22 L284 22 L284 48 L310 48 L310 36 L330 36 L330 54 L352 54 L352 28 L372 28 L372 46 L400 46 L400 80 Z" fill="rgba(255,255,255,.12)"/></svg></div>
       <div class="tv-lights"><i></i><i></i><i></i></div>
       <div class="tv-top"><span class="tv-bug">${esc(b.channelName)}</span><span class="tv-live">● CANLI</span><span class="tv-viewers">👁 <b id="tv-vw">${(viewers / 1e6).toFixed(2).replace('.', ',')} Mn</b></span></div>
       <div class="tv-stage shot-wide" id="tv-stage">

@@ -510,7 +510,8 @@ export function playCinema(ctx, action, res, { onClose } = {}) {
   const a = res.anim;
   let sc = buildScene(s, action, a);
   // Üretilmiş medya varsa (tools/openai-*.mjs → data/media.js) sahneyi onunla değiştir
-  const vid = a?.kind && MEDIA['video:' + a.kind], pic = a?.kind && MEDIA['scene:' + a.kind];
+  const pick = pre => a?.kind && (MEDIA[`${pre}:${a.kind}:${a.sub}`] || MEDIA[`${pre}:${a.kind}`]);
+  const vid = pick('video'), pic = pick('scene');
   if (vid || pic) sc = { cls: 'sc-media', ms: vid ? 3200 : 2200, html: `${vid ? `<video class="cine-media" src="${vid}" autoplay muted playsinline></video>` : `<img class="cine-media kb" src="${pic}" alt="">`}<div class="cine-cap">${esc(res.title)}</div>` };
   const o = el(`<div class="cine" role="dialog" aria-modal="true" aria-label="${esc(action.label)}">
     <div class="cine-stage ${sc.cls}" id="cstage">${sc.html}<div class="cine-skip">Atlamak için dokun</div></div>

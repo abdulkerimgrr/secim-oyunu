@@ -1,4 +1,5 @@
 // Liderler tartışması ekranı.
+import { MEDIA } from '../../data/media.js';
 import { esc, el } from '../dom.js';
 import { avatarSvg } from '../avatar.js';
 import { mixColor } from '../map.js';
@@ -21,7 +22,7 @@ export function showDebate(ctx, d) {
   let timer = null;
   const o = el(`<div class="tv debate" role="dialog" aria-modal="true" aria-label="Liderler tartışması">
     <div class="tv-screen db-screen">
-      <div class="db-bg"></div>
+      <div class="db-bg" ${MEDIA['bg:debate'] ? `style="background:url(${MEDIA['bg:debate']}) center/cover"` : ''}></div>
       <div class="tv-top"><span class="tv-bug">ORTAK YAYIN</span><span class="tv-live">● CANLI</span><span class="tv-viewers">🗳️ Seçim 2028</span></div>
       <div class="db-title">LİDERLER TARTIŞMASI</div>
       <div class="db-mod">${avatarSvg(mod, { size: 60, bg: 'transparent', mood: 'serious' })}<span>${esc(DEBATE_MODERATOR)} · moderatör</span></div>

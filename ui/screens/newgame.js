@@ -249,7 +249,7 @@ function characterStep() {
     <p class="cc-sub">Farklı geçmişler. Farklı vizyonlar. Farklı bir gelecek.</p>
     <div class="cc-archs" id="cc-archs">${archCards}</div>
     <section class="cc-main">
-      <div class="cc-hero">${sceneSvg('hero')}
+      <div class="cc-hero">${MEDIA['bg:character'] ? `<img class="cc-arch-img" src="${MEDIA['bg:character']}" alt="">` : sceneSvg('hero')}
         <div class="cc-hero-txt"><h2>ADAYINI<br>ÖZELLEŞTİR</h2><p>Kimliğini şekillendir. Hikâyeni kur. Kendi yolunu çiz.</p></div>
         <div class="cc-hero-p" id="char-preview">${avatarSvg(c, { size: 300, bg: 'transparent', pin })}</div>
         <blockquote>“${esc(motto)}”</blockquote>
@@ -406,7 +406,7 @@ function splashHtml() {
     ['Gündeme cevap ver, turu bitir', 'Olaylara ve krizlere tutum al; anketler, rakipler ve ekonomi her ay değişir.'],
     ['Seçim gecesi', '%7 barajı geç, sandalye kazan, iktidarı hedefle.'],
   ];
-  return `<section class="splash"><div class="stripe" aria-hidden="true"></div>
+  return `<section class="splash" ${MEDIA['bg:splash'] ? `style="background:linear-gradient(rgba(20,33,61,.55),rgba(20,33,61,.9)),url(${MEDIA['bg:splash']}) center/cover"` : ''}><div class="stripe" aria-hidden="true"></div>
       <div class="row" style="justify-content:space-between;align-items:flex-start"><div class="eyebrow" style="color:var(--hi)">Siyasi simülasyon · Türkiye</div><div class="row" style="gap:6px;position:relative;z-index:2">${soundToggleHtml()}<button class="snd-toggle" type="button" data-a="audio" aria-label="Ses ve müzik ayarları" title="Ses ve müzik ayarları">⚙️</button></div></div>
       <h1>Sandık<br><em>ve</em> Kürsü</h1>
       <p>Parti kur ya da bir partinin başına geç. 81 il, 600 sandalye, %7 baraj. Küçük başlamak neredeyse umutsuz; iktidar ise çok uzak.</p>

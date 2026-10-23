@@ -72,7 +72,7 @@ export const EXTRA_ACTIONS = {
           if (t.side.money) state.flags.donorChill = addDays(state.date, 28);
         }
         if (p.orgs[prm.province]) p.orgs[prm.province] = clamp(p.orgs[prm.province] + 0.005, 0, 1);
-        return { title: `${name}: ${t.label}`, bad, lines, fx, anim: { kind: 'visit', province: name, label: t.label, icons: [t.icon, '🤝', '👋', '😊', '☕'], color: p.color } };
+        return { title: `${name}: ${t.label}`, bad, lines, fx, anim: { kind: 'visit', sub: t.id, province: name, label: t.label, icons: [t.icon, '🤝', '👋', '😊', '☕'], color: p.color } };
       } },
     { id: 'field', cat: 'Saha', icon: '🚶', label: 'Saha turu', ap: 1, apFor: prm => byId(FIELD_MODES, prm.field).ap, params: ['province', 'choice:field'],
       desc: 'Pazar yeri, köy turu ya da kapı kapı kampanya. Halkla doğrudan temas; kararsız seçmeni ikna etmenin en etkili yolu.',
@@ -109,7 +109,7 @@ export const EXTRA_ACTIONS = {
           }
         }
         if (m.id === 'kapi') lines.push(`${p.orgs[prm.province] ? 'Teşkilat ve gönüllüler kapı kapı dolaştı' : 'Teşkilat olmadığı için ekip küçük kaldı'}; kararsızlar hedeflendi.`);
-        return { title: `${name}: ${m.label}`, bad, lines, fx, anim: { kind: 'visit', province: name, label: m.label, icons: m.id === 'koy' ? ['🌾', '🚜', '☕', '👋', '🐄'] : m.id === 'kapi' ? ['🚪', '📄', '🗣️', '🙂', '🚪'] : ['🧺', '🍅', '🗣️', '💸', '🍞'], color: p.color } };
+        return { title: `${name}: ${m.label}`, bad, lines, fx, anim: { kind: 'visit', sub: m.id, province: name, label: m.label, icons: m.id === 'koy' ? ['🌾', '🚜', '☕', '👋', '🐄'] : m.id === 'kapi' ? ['🚪', '📄', '🗣️', '🙂', '🚪'] : ['🧺', '🍅', '🗣️', '💸', '🍞'], color: p.color } };
       } },
   ],
   medya: [
@@ -157,7 +157,7 @@ export const EXTRA_ACTIONS = {
         }
         const bad = gaffe(state, rng, m.gaffe && e.risk ? e.risk / gaffeChance(state, 1) : 0, p, lines, m.label);
         state.stats.tv++;
-        return { title: m.label, bad, lines, fx, anim: { kind: 'studio', label: m.label, icon: m.icon, channel: m.tv ? CHANNELS[prm.channel].label : null, color: p.color, bad } };
+        return { title: m.label, bad, lines, fx, anim: { kind: 'studio', sub: m.id, label: m.label, icon: m.icon, channel: m.tv ? CHANNELS[prm.channel].label : null, color: p.color, bad } };
       } },
   ],
   vaat: [
@@ -200,7 +200,7 @@ export const EXTRA_ACTIONS = {
         } else addNews(state, 'player', `${p.short} yeni vaadini açıkladı: ${pr.label}`);
         if (e.cons < 0.85) { fx.push(...applyFx(state, { trust: -2 }, rng)); lines.push('⚠️ Vaat partinin çizgisiyle çelişiyor; "U dönüşü" yorumları yapıldı.'); }
         lines.push(`Ekonomik inandırıcılık: ${econCredibility(state)}/100`);
-        return { title: `Vaat: ${pr.label}`, bad, lines, fx, anim: { kind: 'promise', icon: pr.icon, label: pr.label, cost: pr.cost, color: p.color, bad } };
+        return { title: `Vaat: ${pr.label}`, bad, lines, fx, anim: { kind: 'promise', sub: pr.id, icon: pr.icon, label: pr.label, cost: pr.cost, color: p.color, bad } };
       } },
   ],
   rakip: [
@@ -258,7 +258,7 @@ export const EXTRA_ACTIONS = {
             lines.push('Operasyon şimdilik gizli kaldı; önümüzdeki haftalarda ortaya çıkma riski sürüyor.');
           }
         }
-        return { title: `${o.label} · ${t.short}`, bad, lines, fx, anim: { kind: 'oppo', label: o.label, icon: o.icon, target: t.short, targetColor: t.color, color: p.color, bad, dirty: !!o.dirty } };
+        return { title: `${o.label} · ${t.short}`, bad, lines, fx, anim: { kind: 'oppo', sub: o.id, label: o.label, icon: o.icon, target: t.short, targetColor: t.color, color: p.color, bad, dirty: !!o.dirty } };
       } },
   ],
   teskilat: [
@@ -285,7 +285,7 @@ export const EXTRA_ACTIONS = {
         if (d.id === 'uygulama') { const m = Math.round(2000 * l * (0.5 + p.recognition)); p.members += m; lines.push(`Uygulama üzerinden ${m.toLocaleString('tr-TR')} yeni üye`); }
         if (d.mob) lines.push('Seçim günü oylarını sandığa taşıma gücün arttı.');
         addNews(state, 'player', `${p.short} ${d.label.toLocaleLowerCase('tr')} çalışmasını genişletti`);
-        return { title: `${d.label} · seviye ${l}`, lines, fx, anim: { kind: 'infra', icon: d.icon, label: d.label, level: l, color: p.color } };
+        return { title: `${d.label} · seviye ${l}`, lines, fx, anim: { kind: 'infra', sub: d.id, icon: d.icon, label: d.label, level: l, color: p.color } };
       } },
   ],
   cb: [

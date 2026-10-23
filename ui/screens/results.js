@@ -1,4 +1,5 @@
 // Sonuç ekranları: seçim gecesi (il il açılan harita), yerel seçim, kurultay, oyun sonu.
+import { MEDIA } from '../../data/media.js';
 import { esc, el } from '../dom.js';
 import { createMap, mixColor } from '../map.js';
 import { hemicycle } from '../charts.js';
@@ -10,7 +11,7 @@ import { avatarSvg } from '../avatar.js';
 import { sfx } from '../sound.js';
 
 function overlay(html) {
-  const o = el(`<div class="night" role="dialog" aria-modal="true"><div class="inner">${html}</div></div>`);
+  const o = el(`<div class="night" role="dialog" aria-modal="true" ${MEDIA['bg:night'] ? `style="background:linear-gradient(rgba(10,18,38,.82),rgba(10,18,38,.92)),url(${MEDIA['bg:night']}) center/cover"` : ''}><div class="inner">${html}</div></div>`);
   document.body.appendChild(o);
   return o;
 }

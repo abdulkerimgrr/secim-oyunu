@@ -250,7 +250,7 @@ export const ACTIONS = [
       bumpFatigue(state, 'rally', prm.province);
       state.stats.rallies++;
       state.flags.lastPlayerProvs = [prm.province, ...(state.flags.lastPlayerProvs || [])].slice(0, 6);
-      return { title, bad, lines, anim: { kind: 'rally', crowd: Math.max(crowd, 100), capacity: e.capacity, province: name, empty, packed, gaffe, transport,
+      return { title, bad, lines, anim: { kind: 'rally', sub: prm.venue, crowd: Math.max(crowd, 100), capacity: e.capacity, province: name, empty, packed, gaffe, transport,
         color: p.color, short: p.short, fit: e.fit, venue: e.venue.id, weather: e.weather?.id || null, speech: e.speech.text } };
     } },
   { id: 'visit', cat: 'Saha', icon: '🏘️', label: 'Mahalle ziyareti', ap: 1, params: ['province'], fx: { trust: [0, 1], morale: [1, 2] },
@@ -362,7 +362,7 @@ export const ACTIONS = [
       lines.push(`İlk hafta izlenme: ${fmtInt(c.views)}`, def.weeks > 1 ? `Kampanya ${def.weeks} hafta sürecek; Kampanya sekmesinden izleyebilirsin.` : 'Tek haftalık kampanya tamamlandı.');
       if (c.province) lines.push(`${PROVINCE_BY_PLATE[c.province].name} için yerel etki eklendi.`);
       return { title: def.label, bad: c.backfire, lines,
-        anim: { kind: 'social', def: def.id, viral: c.viral, backfire: c.backfire, views: c.views, likes: c.likes, shares: c.shares, comments: c.comments } };
+        anim: { kind: 'social', sub: def.id, def: def.id, viral: c.viral, backfire: c.backfire, views: c.views, likes: c.likes, shares: c.shares, comments: c.comments } };
     },
   })),
 
