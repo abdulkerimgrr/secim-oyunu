@@ -12,6 +12,7 @@ import { sheet } from '../dom.js';
 import { audioSettingsHtml, bindAudioSettings } from '../audioSettings.js';
 import { fmtDate, pct } from '../../engine/util.js';
 import { LOOKS, PROFESSIONS, EDUCATION, TRAITS, ARCHETYPES, archetypeLook, randomCharacter } from '../../data/character.js';
+import { FACE_FIELDS, rankFaces } from '../../data/faces.js';
 import { charStats } from '../../engine/character.js';
 import { MEDIA } from '../../data/media.js';
 import { PROVINCES } from '../../data/generated/provinces.js';
@@ -197,8 +198,30 @@ function sceneSvg(id) {
     </g><rect width="400" height="300" fill="#0B1428" opacity=".25"/></svg>`;
 }
 
+// Gerçekçi görünüm: seçimlere en yakın kurgusal fotoğrafı karaktere bağla (yoksa çizim)
+function syncPortrait(c) {
+  const best = c.realistic === false ? null : rankFaces(c, MEDIA)[0];
+  if (best) c.portraitKey = best.key; else delete c.portraitKey;
+}
+
+function faceGallery(c) {
+  const real = c.realistic !== false;
+  const faces = rankFaces(c, MEDIA).slice(0, 12);
+  const tiles = faces.map(f => `<button type="button" class="cc-face ${!c.photo && c.portraitKey === f.key ? 'on' : ''}" data-face="${f.key}" aria-label="Bu yüzü seç"><img src="${MEDIA[f.key]}" alt=""></button>`).join('');
+  return `<section class="cc-gal">
+    <div class="cc-gal-h"><h3>GÖRÜNÜM</h3>
+      <div class="cc-seg" role="group" aria-label="Görünüm türü"><button type="button" class="${real ? 'on' : ''}" data-real="1">📸 Gerçekçi</button><button type="button" class="${real ? '' : 'on'}" data-real="0">✏️ Çizim</button></div></div>
+    ${real ? `<p>Aşağıdan seçimlerini yap; sana en yakın yüz otomatik gelir. Bir yüze dokunursan görünüm ona göre ayarlanır.</p>
+    <div class="cc-faces">
+      <label class="cc-face up ${c.photo ? 'on' : ''}">${c.photo ? `<img src="${c.photo}" alt="">` : '<span>📷<b>Kendi<br>fotoğrafın</b></span>'}<input type="file" id="f-photo" accept="image/*" hidden></label>
+      ${tiles || '<span class="cc-gal-none">Bu seçimlere uygun hazır fotoğraf yok; çizim kullanılıyor.</span>'}
+    </div>` : '<p>Çizim avatar: tüm ayrıntıları aşağıdan tek tek belirleyebilirsin.</p>'}
+  </section>`;
+}
+
 function characterStep() {
   const c = w.character;
+  syncPortrait(c);
   const female = c.gender === 'k';
   const tab = w.charTab || 'gorunum';
   const provs = [...PROVINCES].sort((a, b) => a.name.localeCompare(b.name, 'tr'));
@@ -210,7 +233,7 @@ function characterStep() {
     return `<button type="button" class="cc-arch ${c.archetype === a.id ? 'on' : ''}" data-arch="${a.id}">
       ${MEDIA['archetype:' + a.id] ? `<img class="cc-arch-img" src="${MEDIA['archetype:' + a.id]}" alt="">` : `${sceneSvg('ar' + a.id)}<div class="cc-arch-p">${avatarSvg({ ...look, pinColor: pinColor() }, { size: 150, bg: 'transparent', pin: look.pin === false ? null : pinColor() })}</div>`}
       <div class="cc-arch-t"><b>${esc(a.title.toLocaleUpperCase('tr'))}</b><span>${esc(a.tagline)}</span><i>${a.icon}</i></div></button>`;
-  }).join('') + `<label class="cc-arch photo ${c.photo ? 'on' : ''}"><div class="cc-arch-t" style="position:static;background:none"><i style="font-size:34px">📷</i><b>KENDİ FOTOĞRAFIN</b><span>Yalnızca bu cihazda saklanır.</span></div><input type="file" id="f-photo" accept="image/*" hidden></label>`;
+  }).join('');
 
   let panel = '';
   if (tab === 'gorunum') {
@@ -245,9 +268,8 @@ function characterStep() {
   const stats = charStats(c);
   return `<div class="cc">
     <div class="cc-top"><button class="cc-back" data-back="${w.mode}" aria-label="Geri">‹</button><div class="cc-kicker">HALK<br>FİKİR<br>LİDERLİK<br>DEĞİŞİM<i></i></div></div>
-    <h1 class="cc-title">ADAYINI SEÇ</h1>
-    <p class="cc-sub">Farklı geçmişler. Farklı vizyonlar. Farklı bir gelecek.</p>
-    <div class="cc-archs" id="cc-archs">${archCards}</div>
+    <h1 class="cc-title">ADAYINI OLUŞTUR</h1>
+    <p class="cc-sub">Yüzünü, geçmişini ve kişiliğini sen belirle.</p>
     <section class="cc-main">
       <div class="cc-hero">${MEDIA['bg:character'] ? `<img class="cc-arch-img" src="${MEDIA['bg:character']}" alt="">` : sceneSvg('hero')}
         <div class="cc-hero-txt"><h2>ADAYINI<br>ÖZELLEŞTİR</h2><p>Kimliğini şekillendir. Hikâyeni kur. Kendi yolunu çiz.</p></div>
@@ -257,8 +279,9 @@ function characterStep() {
       <div class="cc-id">
         <label class="cc-f"><h4>Ad soyad</h4><input class="cc-in" id="f-player" maxlength="30" value="${esc(w.playerName)}" placeholder="ör. Deniz Arslan" autocomplete="off"></label>
         <label class="cc-f"><h4>Yaş <b id="age-l">${c.age}</b></h4><input type="range" id="f-age" min="30" max="78" value="${c.age}"></label>
-        ${c.photo ? `<button type="button" class="cc-link" data-a="photo-del">Fotoğrafı kaldır, çizimi kullan</button>` : ''}
+        ${c.photo ? `<button type="button" class="cc-link" data-a="photo-del">Yüklediğin fotoğrafı kaldır</button>` : ''}
       </div>
+      ${faceGallery(c)}
       <div class="cc-panel">
         <div class="cc-tabs">${[['gorunum', '👤', 'Görünüm'], ['kiyafet', '👔', 'Kıyafet'], ['kimlik', '📊', 'Kimlik']].map(([id, ic, l]) => `<button type="button" class="${tab === id ? 'on' : ''}" data-ctab="${id}"><span>${ic}</span>${l.toLocaleUpperCase('tr')}</button>`).join('')}</div>
         <div class="cc-body">${panel}</div>
@@ -266,6 +289,8 @@ function characterStep() {
     </section>
     <section class="cc-stats"><h3>TEMEL ÖZELLİKLER</h3>${stats.map(s => `<div class="cc-stat"><span class="ic">${s.icon}</span><span class="l">${s.label}</span><div class="cc-bar"><i style="width:${s.v}%"></i></div><b>${s.v}</b></div>`).join('')}
       <p>Meslek, eğitim ve kişilik seçimlerinden hesaplanır.</p></section>
+    <section class="cc-quick"><h3>HIZLI BAŞLANGIÇ <small>· hazır bir aday tipiyle başla, sonra istediğin gibi değiştir</small></h3>
+      <div class="cc-archs" id="cc-archs">${archCards}</div></section>
     <div class="cc-foot"><button type="button" class="cc-rand" data-a="random">🔀 RASTGELE</button><button type="button" class="cc-ok" data-a="char-next">ADAYI ONAYLA <span>›</span></button></div>
   </div>`;
 }
@@ -281,7 +306,7 @@ function bindCharacter(view, ctx, go) {
   const preview = () => { const el = view.querySelector('#char-preview'); if (el) el.innerHTML = avatarSvg(c, { size: 300, bg: 'transparent', pin: c.pin !== false ? pinColor() : null }); };
   view.querySelector('#f-player').addEventListener('input', e => { w.playerName = e.target.value.trim(); });
   view.querySelector('#f-age').addEventListener('input', e => { c.age = +e.target.value; view.querySelector('#age-l').textContent = c.age; preview(); });
-  view.querySelector('#f-age').addEventListener('change', () => { delete c.portraitKey; rerender(); });
+  view.querySelector('#f-age').addEventListener('change', rerender);
   view.querySelector('#f-home')?.addEventListener('change', e => { c.hometown = +e.target.value; });
   view.querySelector('#f-pin')?.addEventListener('change', e => { c.pin = e.target.checked; rerender(); });
   view.querySelectorAll('[data-ctab]').forEach(b => b.onclick = () => { w.charTab = b.dataset.ctab; rerender(); });
@@ -289,14 +314,22 @@ function bindCharacter(view, ctx, go) {
     const a = ARCHETYPES.find(x => x.id === b.dataset.arch);
     Object.assign(c, archetypeLook(a), { profession: a.profession, education: a.education, traits: [...a.traits], archetype: a.id });
     delete c.photo;
-    if (MEDIA['archetype:' + a.id]) c.portraitKey = 'archetype:' + a.id; else delete c.portraitKey;
     sfx('click');
     rerender();
   });
+  view.querySelectorAll('[data-face]').forEach(b => b.onclick = () => {
+    const f = rankFaces(c, MEDIA).find(x => x.key === b.dataset.face);
+    if (!f) return;
+    for (const k of FACE_FIELDS) if (f.look[k] !== undefined) c[k] = f.look[k];
+    if (c.gender === 'k') c.facial = 'yok';
+    delete c.photo;
+    sfx('click');
+    rerender();
+  });
+  view.querySelectorAll('[data-real]').forEach(b => b.onclick = () => { c.realistic = b.dataset.real === '1'; if (!c.realistic) delete c.photo; rerender(); });
   view.querySelectorAll('[data-ch]').forEach(b => b.onclick = () => {
     const key = b.dataset.ch, v = b.dataset.v;
     c[key] = v;
-    if (!['education', 'profession'].includes(key)) delete c.portraitKey; // görünüm değişti: hazır fotoğraf yerine çizim
     if (key === 'gender') {
       const styles = LOOKS.hairStyle[v].map(h => h[0]);
       if (!styles.includes(c.hairStyle)) c.hairStyle = styles[0];

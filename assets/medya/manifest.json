@@ -1,4 +1,11 @@
 {
   "aciklama": "Oyuna gömülecek üretilmiş görsel ve videolar. Her kayıt: key (oyundaki anahtar), file (bu klasördeki dosya), prompt (üretim metni), source (openai modeli), date.",
-  "items": []
+  "items": [
+    {
+      "key": "archetype:reformcu",
+      "file": "reformcu.webp",
+      "prompt": "Vertical 3:4 portrait (1024x1536). Cinematic photorealistic waist-up portrait of a fictional 42-year-old Turkish man, a reformist politician: wavy black hair, thick eyebrows, blue-grey eyes, fair warm skin, navy blue suit with white shirt, confident hopeful expression, looking slightly off camera. Background: softly blurred Turkish Grand National Assembly (TBMM) building and a Turkish flag, warm golden evening light, shallow depth of field, news photography feel, subtle navy and red color grading. He must be an entirely fictional person who does not resemble any real politician or celebrity. No text, no logos, no party emblems, no watermarks.",
+      "source": "ChatGPT"
+    }
+  ]
 }
